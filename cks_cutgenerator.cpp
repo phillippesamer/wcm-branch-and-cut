@@ -1,6 +1,6 @@
 #include "cks_cutgenerator.h"
 
-CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar *x_vars, IO *instance)
+CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
 {
 
 }

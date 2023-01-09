@@ -30,7 +30,7 @@ int main(int argc, char **argv)
     // 0. PARSE INPUT FILE
 
     IO* instance = new IO();
-    instance->k = atol(argv[2]);
+    instance->num_subgraphs = atol(argv[2]);
 
     if (instance->parse_input_file(string(argv[1])) == false)
     {
@@ -42,7 +42,6 @@ int main(int argc, char **argv)
     // 1. BUILD AND SOLVE CORRESPONDING IP MODEL
 
     CKSModel *model = new CKSModel(instance);
-    /*
     model->set_time_limit(RUN_CKS_WITH_TIME_LIMIT);
     model->solve(true);
 
@@ -55,8 +54,6 @@ int main(int argc, char **argv)
     cout << endl;
 
     cout << "_____________________________________________________________________________" << endl << endl;
-
-    */
     
     delete model;
     delete instance;

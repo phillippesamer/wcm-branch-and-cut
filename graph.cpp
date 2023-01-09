@@ -77,16 +77,17 @@ void Graph::init_lemon()
     for (long i=0; i<num_vertices; ++i)
         lemon_vertices.push_back(lemon_graph->addNode());
 
+    // populate lemon graph from the edge list in this object
     lemon_edges.reserve(num_edges);
     lemon_edges_inverted_index = new ListGraph::EdgeMap<long>(*lemon_graph);
 
-    // populate lemon graph from the edge list in this object
     for (long idx=0; idx<num_edges; ++idx)
     {
         long v1 = s.at(idx);
         long v2 = t.at(idx);
 
-        ListGraph::Edge e = lemon_graph->addEdge(lemon_vertices[v1], lemon_vertices[v2]);
+        ListGraph::Edge e = lemon_graph->addEdge(lemon_vertices[v1],
+                                                 lemon_vertices[v2]);
         lemon_edges.push_back(e);
         (*lemon_edges_inverted_index)[e] = idx;
     }
@@ -100,6 +101,19 @@ void Graph::init_lemon()
  
         (*lemon_weight)[v] = weight;
     }
+}
+
+bool Graph::lemon_test_adj(ListGraph &g,
+                           ListGraph::Node &x,
+                           ListGraph::Node &y)
+{
+    /// auxiliary function to test adjacency in the LEMON data structure
+
+    for (ListGraph::IncEdgeIt e(g, x); e != INVALID; ++e)
+        if ( g.id(g.v(e)) == g.id(y) || g.id(g.u(e)) == g.id(y))
+            return true;
+
+    return false;
 }
 
 ListGraph::Edge Graph::lemon_test_adj_getting_edge(ListGraph &g,
@@ -116,17 +130,4 @@ ListGraph::Edge Graph::lemon_test_adj_getting_edge(ListGraph &g,
             return e;
 
     return INVALID;
-}
-
-bool Graph::lemon_test_adj(ListGraph &g,
-                           ListGraph::Node &x,
-                           ListGraph::Node &y)
-{
-    /// auxiliary function to test adjacency in the LEMON data structure
-
-    for (ListGraph::IncEdgeIt e(g, x); e != INVALID; ++e)
-        if ( g.id(g.v(e)) == g.id(y) || g.id(g.u(e)) == g.id(y))
-            return true;
-
-    return false;
 }

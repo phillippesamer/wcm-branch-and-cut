@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <map>
 
 #include "gurobi_c++.h"
 
@@ -30,7 +31,7 @@
 class CKSCutGenerator: public GRBCallback
 {
 public:
-    CKSCutGenerator(GRBModel *, GRBVar*, IO*);
+    CKSCutGenerator(GRBModel *, GRBVar**, IO*);
     virtual ~CKSCutGenerator();
 
 protected:
@@ -46,6 +47,14 @@ protected:
     GRBVar* x_vars;
     double *x_val;
     long num_vars;
+
+    long minimal_separators_counter;
+    map<long,long> minimal_separators_len;
+    map<string,long> minimal_separators_pool;
+
+    long indegree_counter;
+    map<long,long> indegree_len;
+    map<string,long> indegree_pool;
 };
 
 #endif

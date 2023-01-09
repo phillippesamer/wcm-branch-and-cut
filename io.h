@@ -31,7 +31,7 @@ public:
     bool parse_input_file(string);
 
     // instance data
-    long k;
+    long num_subgraphs;
     string instance_id;
     string instance_id_trimmed;
 

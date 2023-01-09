@@ -1,5 +1,5 @@
-#ifndef _CKSModel_H_
-#define _CKSModel_H_
+#ifndef _CKS_MODEL_H_
+#define _CKS_MODEL_H_
 
 #include <iostream>
 #include <sstream>
@@ -32,11 +32,11 @@ class CKSModel
 public:
     CKSModel(IO*);
     virtual ~CKSModel();
-    
+
     int solve(bool);
     double solution_weight;
     double solution_dualbound;
-    vector<bool> solution_vector;
+    vector<long> solution_vector;   // vertex -> subgraph (-1 if none)
     ModelStatus solution_status;
     double solution_runtime;
 
@@ -48,7 +48,7 @@ protected:
 
     GRBEnv *env;
     GRBModel *model;
-    GRBVar *x;
+    GRBVar **x;
 
     void create_variables();
     void create_constraints();

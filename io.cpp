@@ -2,9 +2,9 @@
 
 IO::IO()
 {
-    // only for consistency (if IO is used without calling parse_input_file)
+    // only for consistency (while parse_input_file() is not called)
     this->graph = new Graph();
-    this->k = 1;
+    this->num_subgraphs = 1;
 }
 
 IO::~IO()
@@ -20,7 +20,6 @@ bool IO::parse_input_file(string filename)
     
     if (input_fh.is_open())
     {
-        // in the gcc format, the first lines might have comments, followed by an instance id
         string line;
         
         // skip comment lines
@@ -32,16 +31,17 @@ bool IO::parse_input_file(string filename)
 
         instance_id.assign(line);
 
-        // trimmed instance id: contents after last slash and before the last dot
+        // trimmed instance id: contents after last slash and before last dot
         size_t dot_pos = filename.find_last_of(".");
         size_t last_slash_pos = filename.find_last_of("/\\");
-        instance_id_trimmed = filename.substr(last_slash_pos+1, dot_pos-1 - last_slash_pos);
+        instance_id_trimmed = filename.substr(last_slash_pos+1,
+                                              dot_pos-1 - last_slash_pos);
 
         // 2 lines for number of vertices and edges
         input_fh >> num_vertices;
         input_fh >> num_edges;
 
-        // initialize graph (own structures and lemon object)
+        // initialize graph (own structures only; lemon object at the end)
         delete graph;
         this->graph = new Graph(num_vertices,num_edges);
         this->graph->init_index_matrix();
@@ -64,7 +64,8 @@ bool IO::parse_input_file(string filename)
             if (graph->index_matrix[i][j] >= 0 ||
                 graph->index_matrix[j][i] >= 0 )
             {
-                cerr << "ERROR: repeated edge in input file line " << line_idx << endl << endl;
+                cerr << "ERROR: repeated edge in input file line "
+                     << line_idx << endl << endl;
                 return false;
             }
             
