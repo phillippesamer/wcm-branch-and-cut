@@ -129,7 +129,7 @@ int CKSModel::solve(bool logging)
         model->set(GRB_IntParam_LazyConstraints, 1);
 
         // trigger b&c separating minimal separator and indegree inequalities 
-        //model->setCallback(this->cutgen);
+        model->setCallback(this->cutgen);
         model->optimize();
 
         // additional information on oci cuts added
