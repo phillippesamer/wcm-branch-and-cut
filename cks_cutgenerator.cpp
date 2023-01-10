@@ -38,7 +38,9 @@ void CKSCutGenerator::callback()
 {
     /***
      * The actual callback method within the solver. Currently, only used for 
-     * adding cuts/lazy constraints dynamically.
+     * dynamically adding violated indegree inequalities (if any) and/or
+     * violated minimal separator inequalities (MSI).
+     * NB! SEARCHING FOR MSI ONLY WHEN NO VIOLATED INDEGREE EXISTS.
      */
 
     try
@@ -55,16 +57,12 @@ void CKSCutGenerator::callback()
                 return;
 
             // retrieve relaxation solution
-            x_val = new GRBVar*[num_vertices];
+            x_val = new double*[num_vertices];
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getNodeRel(x_vars[u], num_subgraphs);
 
-            /***
-             * Find violated indegree inequalities (if any) and/or violated
-             * minimal separator inequalities (MSI) and add cuts to the model.
-             * NB! SEARCHING FOR MSI ONLY WHEN NO VIOLATED INDEGREE EXISTS.
-             */
             bool model_updated = false;
+
             if (SEPARATE_INDEGREE)
                 model_updated = run_indegree_separation(ADD_USER_CUTS);
 
@@ -80,16 +78,12 @@ void CKSCutGenerator::callback()
         else if (where == GRB_CB_MIPSOL)
         {
             // retrieve solution
-            x_val = new GRBVar*[num_vertices];
+            x_val = new double*[num_vertices];
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getSolution(x_vars[u], num_subgraphs);
 
-            /***
-             * Find violated indegree inequalities (if any) and/or violated
-             * minimal separator inequalities (MSI) and add lazy constraints.
-             * NB! SEARCHING FOR MSI ONLY WHEN NO VIOLATED INDEGREE EXISTS.
-             */
             bool model_updated = false;
+
             if (SEPARATE_INDEGREE)
                 model_updated = run_indegree_separation(ADD_LAZY_CNTRS);
 
@@ -115,7 +109,44 @@ void CKSCutGenerator::callback()
 
 bool CKSCutGenerator::separate_lpr()
 {
-    return false;
+    /// Interface to be used when solving the LP relaxation only.
+
+    try
+    {
+        // retrieve relaxation solution
+        x_val = new double*[num_vertices];
+        for (long u = 0; u < num_vertices; ++u)
+        {
+            x_val[u] = new double[num_subgraphs];
+            for (long c = 0; c < num_subgraphs; ++c)
+                x_val[u][c] = x_vars[u][c].get(GRB_DoubleAttr_X);
+        }
+
+        bool model_updated = false;
+
+        if (SEPARATE_INDEGREE)
+            model_updated = run_indegree_separation(ADD_STD_CNTRS);
+
+        if (!model_updated && SEPARATE_MSI)
+            model_updated = run_minimal_separators_separation(ADD_STD_CNTRS);
+
+        for (long u=0; u < num_vertices; u++)
+            delete[] x_val[u];
+        delete[] x_val;
+
+        return model_updated;
+    }
+    catch (GRBException e)
+    {
+        cout << "Error " << e.getErrorCode() << " during separate_lpr(): ";
+        cout << e.getMessage() << endl;
+        return false;
+    }
+    catch (...)
+    {
+        cout << "Unexpected error during separate_lpr()" << endl;
+        return false;
+    }
 }
 
 bool CKSCutGenerator::run_minimal_separators_separation(int)

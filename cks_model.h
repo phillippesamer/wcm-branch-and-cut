@@ -5,6 +5,8 @@
 #include <sstream>
 #include <cmath>
 #include <limits>
+#include <sys/time.h>
+#include <utility>
 
 #include "gurobi_c++.h"
 
@@ -39,6 +41,11 @@ public:
     vector<long> solution_vector;   // vertex -> subgraph (-1 if none)
     ModelStatus solution_status;
     double solution_runtime;
+
+    bool solve_lp_relax(bool);
+    double lp_bound;
+    double lp_runtime;
+    long lp_passes;
 
     double runtime();
     void set_time_limit(double);

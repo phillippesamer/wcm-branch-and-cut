@@ -10,6 +10,8 @@ CKSModel::CKSModel(IO *instance)
     this->solution_status = STATUS_UNKNOWN;
     this->solution_runtime = -1;
 
+    this->lp_bound = this->lp_runtime = this->lp_passes = -1;
+
     try
     {
         this->env = new GRBEnv();
@@ -263,6 +265,113 @@ int CKSModel::save_optimization_status()
         cout << "UNEXPECTED ERROR: unknown status after solve()" << endl;
 
         return 0;
+    }
+}
+
+bool CKSModel::solve_lp_relax(bool logging)
+{
+    /***
+     * Solves the LP relaxation of the full IP formulation for connected
+     * k-subpartitions, including indegree and minimal separator inequalities.
+     * Returns true iff the bound was computed successfully.
+     */
+
+    try
+    {
+        // turn off all gurobi cut generators
+        model->set(GRB_IntParam_Cuts, 0);
+
+        if (logging == true)
+            model->set(GRB_IntParam_OutputFlag, 1);
+        else
+            model->set(GRB_IntParam_OutputFlag, 0);
+
+        // make vars continuous
+        for (long u = 0; u < instance->graph->num_vertices; ++u)
+            for (long c = 0; c < instance->num_subgraphs; ++c)
+                x[u][c].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
+
+        // calculating wall clock time to solve LP relaxation
+        struct timeval *clock_start
+            = (struct timeval *) malloc(sizeof(struct timeval));
+        struct timeval *clock_stop
+            = (struct timeval *) malloc(sizeof(struct timeval));
+
+        gettimeofday(clock_start, 0);
+
+        // solve LP to optimality; then iterate separation and reoptimization
+        model->optimize();
+        bool model_updated = true;
+        this->lp_passes = 1;
+
+        while (model_updated && model->get(GRB_IntAttr_Status) == GRB_OPTIMAL)
+        {
+            #ifdef DEBUG_LPR
+            cout << "LP relaxation pass #" << lp_passes << " (bound = "
+                 << model->get(GRB_DoubleAttr_ObjVal) << ")" << endl;
+            #endif
+
+            // cut generator object used only to find violated inequalities;
+            // the callback in gurobi is not run in this context
+            model_updated = cutgen->separate_lpr();
+
+            if (model_updated)
+            {
+                // reoptimize
+                model->update();
+                model->optimize();
+                this->lp_passes++;
+            }
+        }
+
+        // LP relaxation time
+        gettimeofday(clock_stop, 0);
+        unsigned long clock_time
+            = 1.e6 * (clock_stop->tv_sec - clock_start->tv_sec) +
+                     (clock_stop->tv_usec - clock_start->tv_usec);
+        this->lp_runtime = ((double)clock_time / (double)1.e6);
+        free(clock_start);
+        free(clock_stop);
+
+        // loop might have broken because no violated inequality exists
+        // or because the problem is actually infeasible
+        if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL)
+        {
+            this->lp_bound = model->get(GRB_DoubleAttr_ObjVal);
+            
+            // restore IP model
+            model->set(GRB_IntParam_Cuts, -1);
+            for (long u = 0; u < instance->graph->num_vertices; ++u)
+                for (long c = 0; c < instance->num_subgraphs; ++c)
+                    x[u][c].set(GRB_CharAttr_VType, GRB_BINARY);
+
+            return true;
+        }
+        else if (model->get(GRB_IntAttr_Status) == GRB_INFEASIBLE)
+        {
+            cout << "LP relaxation infeasible!" << endl;
+            cout << "Model runtime: " << lp_runtime << endl;
+            return false;
+        }
+        else
+        {
+            cout << "Unexpected error: solve_lp_relax() got neither optimal "
+                 << "nor infeasible model" << endl;
+            cout << "Model runtime: " << lp_runtime << endl;
+            return false;
+        }
+    }
+    catch(GRBException e)
+    {
+        cout << "Error " << e.getErrorCode()
+             << " during CKSModel::solve_lp_relax(): ";
+        cout << e.getMessage() << endl;
+        return false;
+    }
+    catch (...)
+    {
+        cout << "Unexpected error during CKSModel::solve_lp_relax()" << endl;
+        return false;
     }
 }
 
