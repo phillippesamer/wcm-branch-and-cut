@@ -45,11 +45,12 @@ protected:
     // input and model data
     IO *instance;
     GRBModel *model;
+    long num_vertices;
+    long num_subgraphs;
 
     GRBVar **x_vars;
     double **x_val;
-    long num_vertices;
-    long num_subgraphs;
+    void clean_x_val_beyond_precision(int);
 
     long minimal_separators_counter;
     map<long,long> minimal_separators_len;

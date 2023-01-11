@@ -1,9 +1,8 @@
 #include "cks_cutgenerator.h"
 
 /// algorithm setup switches
-/// MSI = minimal separator inequalities
 
-bool SEPARATE_MSI = true;
+bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
 bool SEPARATE_INDEGREE = true;
 
 bool CUTS_AT_ROOT_ONLY = false;
@@ -11,15 +10,10 @@ bool CUTS_AT_ROOT_ONLY = false;
 bool STORE_MSI_CUT_POOL = false;
 bool STORE_INDEGREE_CUT_POOL = false;
 
-#define MSI_VIOLATION_TOL_IN_IP 0
-#define INDEGREE_VIOLATION_TOL_IN_IP 0
-
 // at most 14 without changing everything to long double (which gurobi ignores)
-#define MSI_SEPARATION_PRECISION_IN_IP 14
-#define INDEGREE_SEPARATION_PRECISION_IN_IP 14
+#define SEPARATION_PRECISION_IN_IP 14
 
 ///////////////////////////////////////////////////////////////////////////////
-
 
 CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
 {
@@ -61,6 +55,8 @@ void CKSCutGenerator::callback()
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getNodeRel(x_vars[u], num_subgraphs);
 
+            clean_x_val_beyond_precision(SEPARATION_PRECISION_IN_IP);
+
             bool model_updated = false;
 
             if (SEPARATE_INDEGREE)
@@ -81,6 +77,8 @@ void CKSCutGenerator::callback()
             x_val = new double*[num_vertices];
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getSolution(x_vars[u], num_subgraphs);
+
+            clean_x_val_beyond_precision(SEPARATION_PRECISION_IN_IP);
 
             bool model_updated = false;
 
@@ -122,6 +120,8 @@ bool CKSCutGenerator::separate_lpr()
                 x_val[u][c] = x_vars[u][c].get(GRB_DoubleAttr_X);
         }
 
+        clean_x_val_beyond_precision(SEPARATION_PRECISION_IN_IP);
+
         bool model_updated = false;
 
         if (SEPARATE_INDEGREE)
@@ -149,24 +149,117 @@ bool CKSCutGenerator::separate_lpr()
     }
 }
 
-bool CKSCutGenerator::run_minimal_separators_separation(int)
+bool CKSCutGenerator::run_minimal_separators_separation(int kind_of_cut)
 {
+    /// wrapper for the separation procedure to suit different execution contexts
+
+    bool model_updated = false;
+
+    // eventual cuts are stored here
+    vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
+    vector<long> cuts_rhs = vector<long>();
+
+    // run separation algorithm from "Partitioning a graph into balanced
+    // connected classes - Formulations, separation and experiments", 2021,
+    // by [Miyazawa, Moura, Ota, Wakabayashi]
+    model_updated = separate_minimal_separators(cuts_lhs,cuts_rhs);
+
+    if (model_updated)
+    {
+        // add cuts
+        for (unsigned long idx = 0; idx<cuts_lhs.size(); ++idx)
+        {
+            ++minimal_separators_counter;
+
+            if (kind_of_cut == ADD_USER_CUTS)
+                addCut(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else if (kind_of_cut == ADD_LAZY_CNTRS)
+                addLazy(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else // kind_of_cut == ADD_STD_CNTRS
+                model->addConstr(cuts_lhs[idx] <= cuts_rhs[idx]);
+        }
+    }
+
+    return model_updated;
+}
+
+bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
+                                                  vector<long> &cuts_rhs)
+{
+    /// Solve the separation problem for minimal (a,b)-separator inequalities
+
+    // TO DO: ALL
+
     return false;
 }
 
-bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &,
-                                                  vector<long> &)
+bool CKSCutGenerator::run_indegree_separation(int kind_of_cut)
 {
-    return false;
+    /// wrapper for the separation procedure to suit different execution contexts
+
+    bool model_updated = false;
+
+    // eventual cuts are stored here
+    vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
+    vector<long> cuts_rhs = vector<long>();
+
+    // run separation algorithm from "On imposing connectivity constraints in
+    // integer programs", 2017, by [Wang, Buchanan, Butenko]
+    model_updated = separate_indegree(cuts_lhs,cuts_rhs);
+
+    if (model_updated)
+    {
+        // add cuts
+        for (unsigned long idx = 0; idx<cuts_lhs.size(); ++idx)
+        {
+            ++indegree_counter;
+
+            if (kind_of_cut == ADD_USER_CUTS)
+                addCut(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else if (kind_of_cut == ADD_LAZY_CNTRS)
+                addLazy(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else // kind_of_cut == ADD_STD_CNTRS
+                model->addConstr(cuts_lhs[idx] <= cuts_rhs[idx]);
+        }
+    }
+
+    return model_updated;
 }
 
-bool CKSCutGenerator::run_indegree_separation(int)
+bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
+                                        vector<long> &cuts_rhs)
 {
-    return false;
+    /// Solve the separation problem for indegree inequalities
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
-bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &, vector<long> &)
+void CKSCutGenerator::clean_x_val_beyond_precision(int precision)
 {
-    return false;
+    /// prevent floating point errors by ignoring digits beyond given precision
+    for (long u = 0; u < num_vertices; ++u)
+        for (long c = 0; c < num_subgraphs; ++c)
+        {
+            double tmp = x_val[u][c] * std::pow(10, precision);
+            tmp = std::round(tmp);
+            x_val[u][c] = tmp * std::pow(10, -precision);
+        }
 }
-
