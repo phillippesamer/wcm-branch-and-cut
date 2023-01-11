@@ -140,24 +140,8 @@ int CKSModel::solve(bool logging)
             cout << cutgen->minimal_separators_counter
                  << " minimal separator inequalities added" << endl;
 
-            for (map<long,long>::iterator
-                 it = cutgen->minimal_separators_len.begin();
-                 it != cutgen->minimal_separators_len.end(); ++it)
-            {
-                    cout << setw(6) << it->second << " separators of size "
-                         << it->first << endl;
-            }
-
             cout << cutgen->indegree_counter
                  << " indegree inequalities added" << endl;
-
-            for (map<long,long>::iterator
-                 it = cutgen->indegree_len.begin();
-                 it != cutgen->indegree_len.end(); ++it)
-            {
-                    cout << setw(6) << it->second <<" indegree vectors of size "
-                         << it->first << endl;
-            }
         }
 
         return this->save_optimization_status();
@@ -384,4 +368,3 @@ void CKSModel::set_time_limit(double tl)
 {
     model->set(GRB_DoubleParam_TimeLimit, tl);
 }
-

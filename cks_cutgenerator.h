@@ -50,78 +50,15 @@ protected:
 
     GRBVar **x_vars;
     double **x_val;
-    void clean_x_val_beyond_precision(int);
+    void inline clean_x_val_beyond_precision(int);
 
     long minimal_separators_counter;
-    map<long,long> minimal_separators_len;
-    map<string,long> minimal_separators_pool;
     bool run_minimal_separators_separation(int);
     bool separate_minimal_separators(vector<GRBLinExpr> &, vector<long> &);
 
     long indegree_counter;
-    map<long,long> indegree_len;
-    map<string,long> indegree_pool;
     bool run_indegree_separation(int);
     bool separate_indegree(vector<GRBLinExpr> &, vector<long> &);
-};
-
-/// information of a violated (a,b)-separator inequality
-class violated_separator
-{
-public:
-    violated_separator(long vertex_count, long a, long b)
-    {
-        this->vertex_count = vertex_count;
-        this->a = a;
-        this->b = b;
-        this->S = vector<long>();
-        coefficients = vector<long>(vertex_count, 0);
-    }
-
-    virtual ~violated_separator() { }
-    
-    string toString()
-    {
-        stringstream lhs;
-        lhs.str("");
-        for (long i = 0; i<vertex_count; ++i)
-            lhs << coefficients.at(i);
-        return lhs.str();
-    }
-
-    long vertex_count;          // instance parameter
-    long a;
-    long b;
-    vector<long> S;             // index of vertices in the (a,b)-separator
-    double infeasibility;
-    vector<long> coefficients;
-};
-
-/// information of a violated indegree inequality
-class violated_indegree
-{
-public:
-    violated_indegree(long vertex_count)
-    {
-        this->vertex_count = vertex_count;
-        infeasibility = 0;
-        coefficients = vector<long>(vertex_count, 0);
-    }
-
-    virtual ~violated_indegree() { }
-    
-    string toString()
-    {
-        stringstream lhs;
-        lhs.str("");
-        for (long i = 0; i<vertex_count; ++i)
-            lhs << coefficients.at(i);
-        return lhs.str();
-    }
-
-    long vertex_count;           // instance parameter
-    double infeasibility;
-    vector<long> coefficients;   // (1 - d_u) for u \in V
 };
 
 #endif

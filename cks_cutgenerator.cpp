@@ -7,8 +7,8 @@ bool SEPARATE_INDEGREE = true;
 
 bool CUTS_AT_ROOT_ONLY = false;
 
-bool STORE_MSI_CUT_POOL = false;
-bool STORE_INDEGREE_CUT_POOL = false;
+// strategy for running separation algorithms for colour-specific inequalities
+bool RUN_SEPARATION_FOR_ALL_COLOURS = false;
 
 // at most 14 without changing everything to long double (which gurobi ignores)
 #define SEPARATION_PRECISION_IN_IP 14
@@ -159,9 +159,10 @@ bool CKSCutGenerator::run_minimal_separators_separation(int kind_of_cut)
     vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
     vector<long> cuts_rhs = vector<long>();
 
-    // run separation algorithm from "Partitioning a graph into balanced
-    // connected classes - Formulations, separation and experiments", 2021,
-    // by [Miyazawa, Moura, Ota, Wakabayashi]
+    /* run separation algorithm from "Partitioning a graph into balanced
+     * connected classes - Formulations, separation and experiments", 2021,
+     * by [Miyazawa, Moura, Ota, Wakabayashi]
+     */
     model_updated = separate_minimal_separators(cuts_lhs,cuts_rhs);
 
     if (model_updated)
@@ -205,8 +206,9 @@ bool CKSCutGenerator::run_indegree_separation(int kind_of_cut)
     vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
     vector<long> cuts_rhs = vector<long>();
 
-    // run separation algorithm from "On imposing connectivity constraints in
-    // integer programs", 2017, by [Wang, Buchanan, Butenko]
+    /* run separation algorithm from "On imposing connectivity constraints in
+     * integer programs", 2017, by [Wang, Buchanan, Butenko]
+     */
     model_updated = separate_indegree(cuts_lhs,cuts_rhs);
 
     if (model_updated)
@@ -233,23 +235,52 @@ bool CKSCutGenerator::run_indegree_separation(int kind_of_cut)
 bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
                                         vector<long> &cuts_rhs)
 {
-    /// Solve the separation problem for indegree inequalities
+    /// Solve the separation problem for indegree inequalities, for each colour
 
+    const long num_edges = instance->graph->num_edges;
 
+    long colour = 0;
+    bool done = false;
+    while (colour < num_subgraphs && !done)
+    {
+        vector<long> indegree = vector<long>(num_vertices, 0);
 
+        // 1. COMPUTE INDEGREE ORIENTING EDGES ACCORDING TO RELAXATION SOLUTION
+        for (long idx = 0; idx < num_edges; ++idx)
+        {
+            long u = instance->graph->s.at(idx);
+            long v = instance->graph->t.at(idx);
+            if (x_val[u][colour] > x_val[v][colour])
+                indegree.at(v) += 1;
+            else
+                indegree.at(u) += 1;
+        }
 
+        // 2. EVALUATE LHS (1-d[u])*x[u]
+        double lhs_sum = 0.;
+        for (long u = 0; u < num_vertices; ++u)
+            lhs_sum += ( (1 - indegree.at(u)) * x_val[u][colour] );
 
+        // 3. FOUND MOST VIOLATED INDEGREE INEQUALITY (IF ANY) IF LHS > 1
+        if (lhs_sum > 1)
+        {
+            // store inequality (caller method adds it to the model)
+            GRBLinExpr violated_constr = 0;
 
+            for (long u = 0; u < num_vertices; ++u)
+                violated_constr += ( (1 - indegree.at(u)) * x_vars[u][colour] );
 
+            cuts_lhs.push_back(violated_constr);
+            cuts_rhs.push_back(1);
 
+            if (!RUN_SEPARATION_FOR_ALL_COLOURS)
+                done = true;
+        }
 
+        ++colour;
+    }
 
-
-
-
-
-
-
+    return (cuts_lhs.size() > 0);
 }
 
 void CKSCutGenerator::clean_x_val_beyond_precision(int precision)
