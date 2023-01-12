@@ -8,6 +8,12 @@
 
 #include "gurobi_c++.h"
 
+// using the preflow-push algorithm in COIN-OR:LEMON (see: www.lemon.cs.elte.hu)
+#include <lemon/concepts/digraph.h>
+#include <lemon/smart_graph.h>
+#include <lemon/preflow.h>
+using namespace lemon;
+
 #include "io.h"
 #include "cks_model.h"
 
@@ -52,13 +58,13 @@ protected:
     double **x_val;
     void inline clean_x_val_beyond_precision(int);
 
-    long minimal_separators_counter;
-    bool run_minimal_separators_separation(int);
-    bool separate_minimal_separators(vector<GRBLinExpr> &, vector<long> &);
-
     long indegree_counter;
     bool run_indegree_separation(int);
     bool separate_indegree(vector<GRBLinExpr> &, vector<long> &);
+
+    long minimal_separators_counter;
+    bool run_minimal_separators_separation(int);
+    bool separate_minimal_separators(vector<GRBLinExpr> &, vector<long> &);
 };
 
 #endif

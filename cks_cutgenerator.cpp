@@ -8,7 +8,8 @@ bool SEPARATE_INDEGREE = true;
 bool CUTS_AT_ROOT_ONLY = false;
 
 // strategy for running separation algorithms for colour-specific inequalities
-bool RUN_SEPARATION_FOR_ALL_COLOURS = false;
+bool SEARCH_ALL_COLOURS_FOR_INDEGREE = true;
+bool SEARCH_ALL_COLOURS_FOR_MSI = true;
 
 // at most 14 without changing everything to long double (which gurobi ignores)
 #define SEPARATION_PRECISION_IN_IP 14
@@ -24,8 +25,8 @@ CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
     this->num_vertices = instance->graph->num_vertices;
     this->num_subgraphs = instance->num_subgraphs;
 
-    this->minimal_separators_counter = 0;
     this->indegree_counter = 0;
+    this->minimal_separators_counter = 0;
 }
 
 void CKSCutGenerator::callback()
@@ -149,51 +150,16 @@ bool CKSCutGenerator::separate_lpr()
     }
 }
 
-bool CKSCutGenerator::run_minimal_separators_separation(int kind_of_cut)
+void CKSCutGenerator::clean_x_val_beyond_precision(int precision)
 {
-    /// wrapper for the separation procedure to suit different execution contexts
-
-    bool model_updated = false;
-
-    // eventual cuts are stored here
-    vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
-    vector<long> cuts_rhs = vector<long>();
-
-    /* run separation algorithm from "Partitioning a graph into balanced
-     * connected classes - Formulations, separation and experiments", 2021,
-     * by [Miyazawa, Moura, Ota, Wakabayashi]
-     */
-    model_updated = separate_minimal_separators(cuts_lhs,cuts_rhs);
-
-    if (model_updated)
-    {
-        // add cuts
-        for (unsigned long idx = 0; idx<cuts_lhs.size(); ++idx)
+    /// prevent floating point errors by ignoring digits beyond given precision
+    for (long u = 0; u < num_vertices; ++u)
+        for (long c = 0; c < num_subgraphs; ++c)
         {
-            ++minimal_separators_counter;
-
-            if (kind_of_cut == ADD_USER_CUTS)
-                addCut(cuts_lhs[idx] <= cuts_rhs[idx]);
-
-            else if (kind_of_cut == ADD_LAZY_CNTRS)
-                addLazy(cuts_lhs[idx] <= cuts_rhs[idx]);
-
-            else // kind_of_cut == ADD_STD_CNTRS
-                model->addConstr(cuts_lhs[idx] <= cuts_rhs[idx]);
+            double tmp = x_val[u][c] * std::pow(10, precision);
+            tmp = std::round(tmp);
+            x_val[u][c] = tmp * std::pow(10, -precision);
         }
-    }
-
-    return model_updated;
-}
-
-bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
-                                                  vector<long> &cuts_rhs)
-{
-    /// Solve the separation problem for minimal (a,b)-separator inequalities
-
-    // TO DO: ALL
-
-    return false;
 }
 
 bool CKSCutGenerator::run_indegree_separation(int kind_of_cut)
@@ -273,7 +239,7 @@ bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
             cuts_lhs.push_back(violated_constr);
             cuts_rhs.push_back(1);
 
-            if (!RUN_SEPARATION_FOR_ALL_COLOURS)
+            if (!SEARCH_ALL_COLOURS_FOR_INDEGREE)
                 done = true;
         }
 
@@ -283,14 +249,146 @@ bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
     return (cuts_lhs.size() > 0);
 }
 
-void CKSCutGenerator::clean_x_val_beyond_precision(int precision)
+bool CKSCutGenerator::run_minimal_separators_separation(int kind_of_cut)
 {
-    /// prevent floating point errors by ignoring digits beyond given precision
-    for (long u = 0; u < num_vertices; ++u)
-        for (long c = 0; c < num_subgraphs; ++c)
+    /// wrapper for the separation procedure to suit different execution contexts
+
+    bool model_updated = false;
+
+    // eventual cuts are stored here
+    vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
+    vector<long> cuts_rhs = vector<long>();
+
+    /* run separation algorithm from "Partitioning a graph into balanced
+     * connected classes - Formulations, separation and experiments", 2021,
+     * by [Miyazawa, Moura, Ota, Wakabayashi]
+     */
+    model_updated = separate_minimal_separators(cuts_lhs,cuts_rhs);
+
+    if (model_updated)
+    {
+        // add cuts
+        for (unsigned long idx = 0; idx<cuts_lhs.size(); ++idx)
         {
-            double tmp = x_val[u][c] * std::pow(10, precision);
-            tmp = std::round(tmp);
-            x_val[u][c] = tmp * std::pow(10, -precision);
+            ++minimal_separators_counter;
+
+            if (kind_of_cut == ADD_USER_CUTS)
+                addCut(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else if (kind_of_cut == ADD_LAZY_CNTRS)
+                addLazy(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else // kind_of_cut == ADD_STD_CNTRS
+                model->addConstr(cuts_lhs[idx] <= cuts_rhs[idx]);
         }
+    }
+
+    return model_updated;
+}
+
+bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
+                                                  vector<long> &cuts_rhs)
+{
+    /// Solve the separation problem for minimal (a,b)-separator inequalities
+
+    long colour = 0;
+    bool done = false;
+    while (colour < num_subgraphs && !done)
+    {
+        // 1. CONSTRUCT AUXILIARY NETWORK D, WITH REDUCTIONS FROM INTEGRAL VARS
+
+        // TO DO: explain network
+        // TO DO: explain reductions
+
+        map<long,long> digraph2original_vertex_map;
+
+        // TO DO: determine map
+
+
+
+
+
+
+
+
+
+        /* 2. TRY EACH PAIR OF NON-ADJACENT VERTICES (IN THE ORIGINAL GRAPH)
+         * WHOSE COMBINED VALUES IN THIS RELAXATION SOLUTION EXCEEDS 1
+         * AS LONG AS A VIOLATED MSI IS NOT FOUND
+         */
+
+        bool done_with_this_colour = false;
+        long s = 0;
+        while (s < num_vertices && !done_with_this_colour)
+        {
+            long t = s+1;
+            while (t < num_vertices && !done_with_this_colour)
+            {
+                if ( instance->graph->index_matrix[s][t] < 0 &&
+                     x_val[s][colour] + x_val[t][colour] > 1 )
+                {
+                    // 3. MAX FLOW COMPUTATION
+
+
+
+                    // 4. IF THE MAX FLOW (MIN CUT) IS LESS THAN WHAT THE
+                    // INEQUALITY PRESCRIBES, WE FOUND A CUT
+
+                    if (maxflow_value < x_val[s][colour] + x_val[t][colour] - 1)
+                    {
+                        // 5. DETERMINE VERTICES IN ORIGINAL GRAPH CORRESPONDING
+                        // TO ARCS IN THE MIN CUT
+
+
+
+
+                        // TO DO: 6. LIFT VIOLATED INEQUALITY BY REDUCING S
+
+
+
+
+
+
+                        // determine inequality
+
+
+
+
+
+
+
+                        done_with_this_colour = true;
+
+                        //if (!SEARCH_ALL_COLOURS_FOR_MSI)
+                        //    done = true;
+                    }
+
+
+
+
+
+                }
+
+
+
+
+
+
+
+                ++t;
+            }
+
+            ++s;
+        }
+
+
+
+
+
+
+
+        ++colour;
+    }
+
+    return (cuts_lhs.size() > 0);
 }
