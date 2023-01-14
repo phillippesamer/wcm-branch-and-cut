@@ -16,6 +16,41 @@ bool SEARCH_ALL_COLOURS_FOR_MSI = true;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/// specialized depth-first search to identify/count connected components
+
+void dfs_to_tag_components(long u,
+                           long count, 
+                           vector<long> &components, 
+                           vector< vector<long> > &adj_list)
+{
+    // auxiliary dfs to check connected components in adj_list
+    components[u] = count;
+
+    for (unsigned i=0; i<adj_list[u].size(); ++i)
+    {
+        long v = adj_list[u].at(i);
+        if (components[v] < 0)
+            dfs_to_tag_components(v, count, components, adj_list);
+    }
+}
+
+long check_components(vector< vector<long> > &adj_list,
+                      vector<long> &components)
+{
+    long count = 0;
+    for (long u = 0; u < adj_list.size(); ++u)
+    {
+        if (components[u] < 0)
+            dfs_to_tag_components(u, count, components, adj_list);
+
+        ++count;
+    }
+
+    return count;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
 {
     this->model = model;
@@ -297,23 +332,103 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
     {
         // 1. CONSTRUCT AUXILIARY NETWORK D, WITH REDUCTIONS FROM INTEGRAL VARS
 
-        // TO DO: explain network
-        // TO DO: explain reductions
+        // LEMON digraph representing the current solution
+        SmartDigraph lemon_g;
+        SmartDigraph::ArcMap<double> lemon_cap(lemon_g);
+        vector<SmartDigraph::Node> lemon_vertices;
+        map<pair<long,long>, SmartDigraph::Arc> lemon_arcs;
+        long size_D = 0;
 
-        map<long,long> digraph2original_vertex_map;
+        vector<long> vars_at_one = vector<long>();
 
-        // TO DO: determine map
+        // maps u->u_1 ; u_2 = D_idx_of_vertex[u]+1 for fractional x_val[u]
+        vector<long> D_idx_of_vertex = vector<long>(num_vertices, -1);
+
+        for (long u = 0; u < num_vertices; ++u)
+        {
+            if (x_val[u][colour] == 0)
+            {
+                // add only one vertex u_1 = u_2 in D
+                lemon_vertices.push_back(lemon_g.addNode());
+                D_idx_of_vertex[u] = size_D;
+                ++size_D;
+            }
+            else if(x_val[u][colour] > 0 && x_val[u][colour] < 1)
+            {
+                // add two vertices u_1, u_2 in D
+                lemon_vertices.push_back(lemon_g.addNode());
+                lemon_vertices.push_back(lemon_g.addNode());
+                D_idx_of_vertex[u] = size_D;
+                size_D += 2;
+            }
+            else // x_val[u][colour] == 1
+                vars_at_one.push_back(u);
+        }
+
+        // inspect subgraph induced by vertices at one (contracted if adjacent)
+        long num_vars_at_one = vars_at_one.size();
+
+        vector< vector<long> > aux_adj_list;
+
+        for (long i = 0; i < num_vars_at_one; ++i)
+            aux_adj_list.push_back(vector<long>());
+
+        for (long i = 0; i < num_vars_at_one; ++i)
+            for (long j = i+1; j < num_vars_at_one; ++j)
+            {
+                long u = vars_at_one.at(i);
+                long v = vars_at_one.at(j);
+                if (instance->graph->index_matrix[u][v] >= 0)
+                {
+                    // i-th vertex at one (u) adjacent to j-th one (v)
+                    aux_adj_list[i].push_back(j);
+                    aux_adj_list[j].push_back(i);
+                }
+            }
+
+        // dfs in this auxiliary graph tagging connected components
+        vector<long> components = vector<long>(num_var_at_one, -1);
+        long num_components = check_components(aux_adj_list, components);
+
+        // add one vertex in D for each component in the auxiliary graph
+        for (long i = 0; i < num_components; ++i)
+            lemon_vertices.push_back(lemon_g.addNode());
+
+        for (long i = 0; i < num_vars_at_one; ++i)
+        {
+            long u = vars_at_one.at(i);
+            long cluster = size_D + components.at(i); // size_D not updated yet
+            D_idx_of_vertex[u] = cluster;
+        }
+
+        size_D += num_components;
+
+        // TO DO: check implementation of check_components
+        // !!! CUIDADO COM ÍNDICES i,j ACIMA E ÍNDICES REAIS (ARMAZENADOS EM vars_at_one)
 
 
 
 
 
+
+        // create arcs
+
+
+
+        // lemon_arcs[make_pair(v1,v2)] = lemon_g.addArc(lemon_vertices[v1], lemon_vertices[v2]);
+        // lemon_cap[ lemon_arcs[make_pair(v1,v2)] ] = x_val[v][colour];
+
+
+
+
+
+        // TO DO: replace names of lemon structures
 
 
 
 
         /* 2. TRY EACH PAIR OF NON-ADJACENT VERTICES (IN THE ORIGINAL GRAPH)
-         * WHOSE COMBINED VALUES IN THIS RELAXATION SOLUTION EXCEEDS 1
+         * WHOSE COMBINED VALUES IN THIS RELAXATION SOLUTION EXCEED 1
          * AS LONG AS A VIOLATED MSI IS NOT FOUND
          */
 
