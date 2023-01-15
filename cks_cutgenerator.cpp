@@ -405,7 +405,7 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             }
 
         // dfs in this auxiliary graph tagging connected components
-        vector<long> components = vector<long>(num_var_at_one, -1);
+        vector<long> components = vector<long>(num_vars_at_one, -1);
         long num_components = check_components(aux_adj_list, components);
 
         // add one vertex in D for each component in the auxiliary graph
@@ -547,78 +547,109 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
 
         /* 2. TRY EACH PAIR OF NON-ADJACENT VERTICES (IN THE ORIGINAL GRAPH)
          * WHOSE COMBINED VALUES IN THIS RELAXATION SOLUTION EXCEED 1
-         * AS LONG AS A VIOLATED MSI IS NOT FOUND
+         * (OTHERWISE THE CORRESPONDNG MSI CANNOT BE VIOLATED)
          */
 
+        // NOTE: not looking for more than 1 violated MSI for a given color
         bool done_with_this_colour = false;
+
         long s = 0;
         while (s < num_vertices && !done_with_this_colour)
         {
             long t = s+1;
             while (t < num_vertices && !done_with_this_colour)
             {
-                if ( instance->graph->index_matrix[s][t] < 0 &&
-                     x_val[s][colour] + x_val[t][colour] > 1 )
+                // account for possible contractions due to integral x_(t,c)
+                long s_in_D = D_idx_of_vertex[s];
+                long t_in_D = (x_val[t][colour] == 1) ? D_idx_of_vertex[t]
+                                                      : D_idx_of_vertex[t] + 1;
+
+                if ( instance->graph->index_matrix[s][t] < 0 &&  // non-adjacent
+                     x_val[s][colour] + x_val[t][colour] > 1 &&  // might cut x*
+                     s_in_D != t_in_D )                        // not contracted
                 {
                     // 3. MAX FLOW COMPUTATION
 
+                    /***
+                     * Using the first phase of Goldberg & Tarjan preflow
+                     * push-relabel algorithm (with "highest label" and "bound
+                     * decrease" heuristics). The worst case time complexity of
+                     * the algorithm is in O(n^2 * m^0.5), n and m wrt D
+                     */
 
+                    Preflow<SmartDigraph, SmartDigraph::ArcMap<double> >
+                        s_t_preflow(D, D_capacity, D_vertices[s_in_D],
+                                                   D_vertices[t_in_D]);
+
+                    s_t_preflow.runMinCut();
+                    
+                    double mincut = s_t_preflow.flowValue();
 
                     // 4. IF THE MAX FLOW (MIN CUT) IS LESS THAN WHAT THE
                     // INEQUALITY PRESCRIBES, WE FOUND A CUT
 
-                    if (maxflow_value < x_val[s][colour] + x_val[t][colour] - 1)
+                    if (mincut < x_val[s][colour] + x_val[t][colour] - 1)
                     {
                         // 5. DETERMINE VERTICES IN ORIGINAL GRAPH CORRESPONDING
                         // TO ARCS IN THE MIN CUT
 
+                        vector<long> S = vector<long>();
 
+                        for (long u = 0; u < num_vertices; ++u)
+                        {
+                            long u_in_D = D_idx_of_vertex[u];
 
+                            // query if u1 is on the source side of the min cut
+                            if ( s_t_preflow.minCut(D_vertices[u_in_D]) )
+                            {
+                                bool u_at_zero = x_val[u][colour] == 0;
+
+                                bool u_frac = x_val[u][colour] > 0 &&
+                                              x_val[u][colour] < 1 ;
+
+                                long u2_in_D = u_frac ? D_idx_of_vertex[u] + 1
+                                                      : D_idx_of_vertex[u];
+
+                                bool u2_separated =
+                                    ! s_t_preflow.minCut(D_vertices[u2_in_D]);
+
+                                if (u_at_zero || (u_frac && u2_separated) )
+                                    S.push_back(u);
+                            }
+                        }
+
+                        // TO DO: ASSERT VIOLATED INEQUALITY
 
                         // TO DO: 6. LIFT VIOLATED INEQUALITY BY REDUCING S
 
+                        // 7. DETERMINE INEQUALITY
 
+                        GRBLinExpr violated_constr = 0;
 
+                        violated_constr += x_vars[s][colour];
+                        violated_constr += x_vars[t][colour];
 
+                        for (vector<long>::iterator it = S.begin();
+                                                    it != S.end(); ++it)
+                        {
+                            violated_constr += ( (-1) * x_vars[*it][colour] );
+                        }
 
-
-                        // determine inequality
-
-
-
-
-
-
+                        cuts_lhs.push_back(violated_constr);
+                        cuts_rhs.push_back(1);
 
                         done_with_this_colour = true;
 
-                        //if (!SEARCH_ALL_COLOURS_FOR_MSI)
-                        //    done = true;
+                        if (!SEARCH_ALL_COLOURS_FOR_MSI)
+                            done = true;
                     }
-
-
-
-
-
                 }
-
-
-
-
-
-
 
                 ++t;
             }
 
             ++s;
         }
-
-
-
-
-
-
 
         ++colour;
     }
