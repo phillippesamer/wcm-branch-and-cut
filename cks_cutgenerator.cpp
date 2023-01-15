@@ -18,15 +18,18 @@ bool SEARCH_ALL_COLOURS_FOR_MSI = true;
 
 /// specialized depth-first search to identify/count connected components
 
-void dfs_to_tag_components(long u,
-                           long count, 
-                           vector<long> &components, 
-                           vector< vector<long> > &adj_list)
+void inline dfs_to_tag_components(long u,
+                                  long count, 
+                                  vector<long> &components, 
+                                  vector< vector<long> > &adj_list)
 {
     // auxiliary dfs to check connected components in adj_list
+
     components[u] = count;
 
-    for (unsigned i=0; i<adj_list[u].size(); ++i)
+    const long degree = adj_list[u].size();
+
+    for (long i = 0; i < degree; ++i)
     {
         long v = adj_list[u].at(i);
         if (components[v] < 0)
@@ -34,11 +37,15 @@ void dfs_to_tag_components(long u,
     }
 }
 
-long check_components(vector< vector<long> > &adj_list,
-                      vector<long> &components)
+long inline check_components(vector< vector<long> > &adj_list,
+                             vector<long> &components)
 {
+    /// NB! Expect components initialized as vector<long>(adj_list.size(), -1)
+
     long count = 0;
-    for (long u = 0; u < adj_list.size(); ++u)
+    const long n = adj_list.size();
+
+    for (long u = 0; u < n; ++u)
     {
         if (components[u] < 0)
             dfs_to_tag_components(u, count, components, adj_list);
@@ -333,37 +340,48 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
         // 1. CONSTRUCT AUXILIARY NETWORK D, WITH REDUCTIONS FROM INTEGRAL VARS
 
         // LEMON digraph representing the current solution
-        SmartDigraph lemon_g;
-        SmartDigraph::ArcMap<double> lemon_cap(lemon_g);
-        vector<SmartDigraph::Node> lemon_vertices;
-        map<pair<long,long>, SmartDigraph::Arc> lemon_arcs;
-        long size_D = 0;
+        SmartDigraph D;
+        vector<SmartDigraph::Node> D_vertices;
+        map<pair<long,long>, SmartDigraph::Arc> D_arcs;
+        SmartDigraph::ArcMap<double> D_capacity(D);
+        long D_size = 0;
 
         vector<long> vars_at_one = vector<long>();
+        vector<long> fractional_vars_D_idx = vector<long>();
+        vector<double> fractional_vars_val = vector<double>();
 
         // maps u->u_1 ; u_2 = D_idx_of_vertex[u]+1 for fractional x_val[u]
         vector<long> D_idx_of_vertex = vector<long>(num_vertices, -1);
 
+        // 1.1 ADD VERTICES CORRESPONDING TO VARS IN [0,1) IN THIS RELAXATION
         for (long u = 0; u < num_vertices; ++u)
         {
-            if (x_val[u][colour] == 0)
+            const double value = x_val[u][colour];
+            if (value == 0)
             {
                 // add only one vertex u_1 = u_2 in D
-                lemon_vertices.push_back(lemon_g.addNode());
-                D_idx_of_vertex[u] = size_D;
-                ++size_D;
+                D_vertices.push_back(D.addNode());
+                D_idx_of_vertex[u] = D_size;
+                ++D_size;
             }
-            else if(x_val[u][colour] > 0 && x_val[u][colour] < 1)
+            else if(value > 0 && value < 1)
             {
                 // add two vertices u_1, u_2 in D
-                lemon_vertices.push_back(lemon_g.addNode());
-                lemon_vertices.push_back(lemon_g.addNode());
-                D_idx_of_vertex[u] = size_D;
-                size_D += 2;
+                D_vertices.push_back(D.addNode());
+                D_vertices.push_back(D.addNode());
+                D_idx_of_vertex[u] = D_size;
+
+                // redundant, but helps adding arcs more efficiently below
+                fractional_vars_D_idx.push_back(D_size);
+                fractional_vars_val.push_back(value);
+
+                D_size += 2;
             }
-            else // x_val[u][colour] == 1
+            else // value == 1
                 vars_at_one.push_back(u);
         }
+
+        // 1.2 ADD VERTICES CORRESPONDING TO VARS AT 1
 
         // inspect subgraph induced by vertices at one (contracted if adjacent)
         long num_vars_at_one = vars_at_one.size();
@@ -392,40 +410,140 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
 
         // add one vertex in D for each component in the auxiliary graph
         for (long i = 0; i < num_components; ++i)
-            lemon_vertices.push_back(lemon_g.addNode());
+            D_vertices.push_back(D.addNode());
 
         for (long i = 0; i < num_vars_at_one; ++i)
         {
             long u = vars_at_one.at(i);
-            long cluster = size_D + components.at(i); // size_D not updated yet
+            long cluster = D_size + components.at(i); // D_size not updated yet
             D_idx_of_vertex[u] = cluster;
         }
 
-        size_D += num_components;
+        D_size += num_components;
 
-        // TO DO: check implementation of check_components
-        // !!! CUIDADO COM ÍNDICES i,j ACIMA E ÍNDICES REAIS (ARMAZENADOS EM vars_at_one)
+        // 1.3 FIRST SET OF ARCS: (U1,U2) FOR U IN V(G) S.T. x_val[u] \in (0,1)
 
+        const unsigned num_frac_vars = fractional_vars_D_idx.size();
 
+        for (unsigned idx = 0; idx < num_frac_vars; ++idx)
+        {
+            long v1 = fractional_vars_D_idx.at(idx);
+            long v2 = v1 + 1;
+            pair<long,long> v1v2 = make_pair(v1,v2);
 
+            D_arcs[v1v2] = D.addArc(D_vertices[v1], D_vertices[v2]);
 
+            D_capacity[ D_arcs[v1v2] ] = fractional_vars_val.at(idx);
+        }
 
+        // 1.4 REMAINING ARCS, WITH UNLIMITED CAPACITY (2 SUFFICES HERE!)
 
-        // create arcs
+        const long num_edges = instance->graph->num_edges;
+        const long UNLIMITED_CAPACITY = 2;
 
+        for (long idx = 0; idx < num_edges; ++idx)
+        {
+            long u = instance->graph->s.at(idx);
+            long v = instance->graph->t.at(idx);
 
+            // the actual arcs (one or two, for each original edge) depend on
+            // the reductions due to integral valued vars (7 cases... boring!)
+            if (x_val[u][colour] == 1 && x_val[v][colour] == 0)
+            {
+                // CASE 1
+                long uu = D_idx_of_vertex[u];
+                long vv = D_idx_of_vertex[v];
+                pair<long,long> uuvv = make_pair(uu,vv);
 
-        // lemon_arcs[make_pair(v1,v2)] = lemon_g.addArc(lemon_vertices[v1], lemon_vertices[v2]);
-        // lemon_cap[ lemon_arcs[make_pair(v1,v2)] ] = x_val[v][colour];
+                D_arcs[uuvv] = D.addArc(D_vertices[uu], D_vertices[vv]);
 
+                D_capacity[ D_arcs[uuvv] ] = UNLIMITED_CAPACITY;
+            }
+            else if (x_val[u][colour] == 0 && x_val[v][colour] == 1)
+            {
+                // CASE 2
+                long uu = D_idx_of_vertex[u];
+                long vv = D_idx_of_vertex[v];
+                pair<long,long> vvuu = make_pair(vv,uu);
 
+                D_arcs[vvuu] = D.addArc(D_vertices[vv], D_vertices[uu]);
 
+                D_capacity[ D_arcs[vvuu] ] = UNLIMITED_CAPACITY;
+            }
+            else if (x_val[u][colour] == 0 && x_val[v][colour] > 0
+                                           && x_val[v][colour] < 1)
+            {
+                // CASE 3
+                long uu = D_idx_of_vertex[u];
+                long v2 = D_idx_of_vertex[v] + 1;
+                pair<long,long> v2uu = make_pair(v2,uu);
 
+                D_arcs[v2uu] = D.addArc(D_vertices[v2], D_vertices[uu]);
 
-        // TO DO: replace names of lemon structures
+                D_capacity[ D_arcs[v2uu] ] = UNLIMITED_CAPACITY;
+            }
+            else if (x_val[u][colour] > 0 && x_val[v][colour] == 0 &&
+                     x_val[u][colour] < 1)
+            {
+                // CASE 4
+                long u2 = D_idx_of_vertex[u] + 1;
+                long vv = D_idx_of_vertex[v];
+                pair<long,long> u2vv = make_pair(u2,vv);
 
+                D_arcs[u2vv] = D.addArc(D_vertices[u2], D_vertices[vv]);
 
+                D_capacity[ D_arcs[u2vv] ] = UNLIMITED_CAPACITY;
+            }
+            else if (x_val[u][colour] > 0 && x_val[v][colour] == 1 &&
+                     x_val[u][colour] < 1)
+            {
+                // CASE 5
+                long u1 = D_idx_of_vertex[u];
+                long u2 = D_idx_of_vertex[u] + 1;
+                long vv = D_idx_of_vertex[v];
+                pair<long,long> u2vv = make_pair(u2,vv);
+                pair<long,long> vvu1 = make_pair(vv,u1);
 
+                D_arcs[u2vv] = D.addArc(D_vertices[u2], D_vertices[vv]);
+                D_arcs[vvu1] = D.addArc(D_vertices[vv], D_vertices[u1]);
+
+                D_capacity[ D_arcs[u2vv] ] = UNLIMITED_CAPACITY;
+                D_capacity[ D_arcs[vvu1] ] = UNLIMITED_CAPACITY;
+            }
+            else if (x_val[u][colour] == 1 && x_val[v][colour] > 0
+                                           && x_val[v][colour] < 1)
+            {
+                // CASE 6
+                long uu = D_idx_of_vertex[u];
+                long v1 = D_idx_of_vertex[v];
+                long v2 = D_idx_of_vertex[v] + 1;
+                pair<long,long> v2uu = make_pair(v2,uu);
+                pair<long,long> uuv1 = make_pair(uu,v1);
+
+                D_arcs[v2uu] = D.addArc(D_vertices[v2], D_vertices[uu]);
+                D_arcs[uuv1] = D.addArc(D_vertices[uu], D_vertices[v1]);
+
+                D_capacity[ D_arcs[v2uu] ] = UNLIMITED_CAPACITY;
+                D_capacity[ D_arcs[uuv1] ] = UNLIMITED_CAPACITY;
+            }
+            else if (x_val[u][colour] > 0 && x_val[v][colour] > 0 &&
+                     x_val[u][colour] < 1 && x_val[v][colour] < 1  )
+            {
+                // CASE 7
+                long u1 = D_idx_of_vertex[u];
+                long u2 = D_idx_of_vertex[u] + 1;
+                long v1 = D_idx_of_vertex[v];
+                long v2 = D_idx_of_vertex[v] + 1;
+                pair<long,long> u2v1 = make_pair(u2,v1);
+                pair<long,long> v2u1 = make_pair(v2,u1);
+
+                D_arcs[u2v1] = D.addArc(D_vertices[u2], D_vertices[v1]);
+                D_arcs[v2u1] = D.addArc(D_vertices[v2], D_vertices[u1]);
+
+                D_capacity[ D_arcs[u2v1] ] = UNLIMITED_CAPACITY;
+                D_capacity[ D_arcs[v2u1] ] = UNLIMITED_CAPACITY;
+            }
+        }
 
         /* 2. TRY EACH PAIR OF NON-ADJACENT VERTICES (IN THE ORIGINAL GRAPH)
          * WHOSE COMBINED VALUES IN THIS RELAXATION SOLUTION EXCEED 1
