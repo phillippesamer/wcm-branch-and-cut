@@ -43,6 +43,9 @@ int main(int argc, char **argv)
 
     CKSModel *model = new CKSModel(instance);
     model->set_time_limit(RUN_CKS_WITH_TIME_LIMIT);
+
+    //model->solve_lp_relax(true);
+
     model->solve(true);
 
     cout << "_____________________________________________________________________________" << endl << endl;
@@ -54,6 +57,8 @@ int main(int argc, char **argv)
     cout << endl;
 
     cout << "_____________________________________________________________________________" << endl << endl;
+    /*
+    */
     
     delete model;
     delete instance;

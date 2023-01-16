@@ -63,6 +63,9 @@ protected:
 
     CKSCutGenerator *cutgen;
 
+    bool check_solution();
+    void dfs_to_tag_component(long, long, vector<long>&, vector<bool>&);
+
     int save_optimization_status();
 };
 

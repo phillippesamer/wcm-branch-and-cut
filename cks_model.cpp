@@ -1,5 +1,10 @@
 #include "cks_model.h"
 
+/// algorithm setup switches
+
+bool CHECK_SOLUTION = true;            // check if the k subgraphs are connected
+
+
 CKSModel::CKSModel(IO *instance)
 {
     this->instance = instance;
@@ -102,10 +107,10 @@ int CKSModel::solve(bool logging)
 {
     try
     {
-        /*
         // turn off all built-in cut generators?
         model->set(GRB_IntParam_Cuts, 0);
 
+        /*
         // turn off all preprocessing and heuristics?
         model->set(GRB_IntParam_Presolve, 0);
         model->set(GRB_IntParam_PrePasses, 0);
@@ -134,14 +139,13 @@ int CKSModel::solve(bool logging)
         model->setCallback(this->cutgen);
         model->optimize();
 
-        // additional information on oci cuts added
         if (logging)
         {
-            cout << cutgen->minimal_separators_counter
-                 << " minimal separator inequalities added" << endl;
+            cout << "Minimal separator inequalities added: "
+                 <<  cutgen->minimal_separators_counter << endl;
 
-            cout << cutgen->indegree_counter
-                 << " indegree inequalities added" << endl;
+            cout << "Indegree inequalities added: "
+                 << cutgen->indegree_counter << endl;
         }
 
         return this->save_optimization_status();
@@ -159,6 +163,78 @@ int CKSModel::solve(bool logging)
         return 0;
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool CKSModel::check_solution()
+{
+    /***
+     * Depth-first search checking each colour induces a connected subgraph.
+     * NB! Assumes an integer feasible solution is available in vars x
+     */
+
+    vector<bool> colour_done = vector<bool>(instance->num_subgraphs, false);
+    vector<bool> vertex_done
+        = vector<bool>(instance->graph->num_vertices, false);
+
+    // retrieve assignment of each vertex in the solution; -1 means uncoloured
+    vector<long> colour_map = vector<long>(instance->graph->num_vertices, -1);
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+    {
+        long c = 0;
+        while (c < instance->num_subgraphs && colour_map.at(u) < 0)
+        {
+            if (this->x[u][c].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
+                colour_map.at(u) = c;
+            else
+                ++c;
+        }
+    }
+
+    // dfs from each colour
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+    {
+        long u_colour = colour_map.at(u);   // -1 if uncoloured
+
+        if (vertex_done.at(u) == false && u_colour > 0)
+        {
+            if (colour_done.at(u_colour))
+            {
+                // had already processed that colour without finding u
+                return false;
+            }
+            else
+            {
+                dfs_to_tag_component(u, u_colour, colour_map, vertex_done);
+                colour_done.at(u_colour) = true;
+            }
+        }
+    }
+
+    return true;
+}
+
+void CKSModel::dfs_to_tag_component(long u,
+                                    long u_colour,
+                                    vector<long> &colour_map,
+                                    vector<bool> &vertex_done)
+{
+    // auxiliary dfs to check the connected component from vertex u
+
+    vertex_done.at(u) = true;
+
+    for (list<long>::iterator it = instance->graph->adj_list.at(u).begin();
+         it != instance->graph->adj_list.at(u).end(); ++it)
+    {
+        long v = *it;
+        long v_colour = colour_map.at(v);
+
+        if (v_colour == u_colour && vertex_done.at(v) == false)
+            dfs_to_tag_component(v, u_colour, colour_map, vertex_done);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 int CKSModel::save_optimization_status()
 {
@@ -201,10 +277,18 @@ int CKSModel::save_optimization_status()
 
         #ifdef DEBUG
             for (long c = 0; c < instance->num_subgraphs; ++c)
-                cout << solution_output[c] << endl;
+                cout << solution_output[c].str() << endl;
         #endif
 
         delete[] solution_output;
+
+       if (CHECK_SOLUTION)
+        {
+            if (this->check_solution())
+                cout << "Passed solution check" << endl;
+            else
+                cout << "WRONG SOLUTION" << endl;
+        }
 
         // returning number of feasible solutions found (including sub-optimal)
         return model->get(GRB_IntAttr_SolCount);
@@ -299,11 +383,10 @@ bool CKSModel::solve_lp_relax(bool logging)
             // the callback in gurobi is not run in this context
             model_updated = cutgen->separate_lpr();
 
+            // reoptimize
             if (model_updated)
             {
-                // reoptimize
-                model->update();
-                model->optimize();
+                model->optimize();  // includes processing pending modifications
                 this->lp_passes++;
             }
         }
@@ -322,12 +405,51 @@ bool CKSModel::solve_lp_relax(bool logging)
         if (model->get(GRB_IntAttr_Status) == GRB_OPTIMAL)
         {
             this->lp_bound = model->get(GRB_DoubleAttr_ObjVal);
-            
+
+            #ifdef DEBUG_LPR
+                cout << "LPR solution: " << endl;
+
+                ostringstream *solution_output 
+                    = new ostringstream[instance->num_subgraphs];
+
+                for (long c = 0; c < instance->num_subgraphs; ++c)
+                {
+                    solution_output[c].str("");
+                    solution_output[c] << "#" << c << ": " << endl;
+                }
+
+                for (long u = 0; u < instance->graph->num_vertices; ++u)
+                    for (long c = 0; c < instance->num_subgraphs; ++c)
+                        if (this->x[u][c].get(GRB_DoubleAttr_X) > EPSILON_TOL)
+                        {
+                            solution_output[c] << "    x[" << u
+                                               << "][" << c << "] = "
+                                               << x[u][c].get(GRB_DoubleAttr_X)
+                                               << endl;
+                        }
+
+                for (long c = 0; c < instance->num_subgraphs; ++c)
+                    cout << solution_output[c].str() << endl;
+
+                delete[] solution_output;
+            #endif
+
+            if (logging)
+            {
+                cout << "Minimal separator inequalities added: "
+                     <<  cutgen->minimal_separators_counter << endl;
+
+                cout << "Indegree inequalities added: "
+                     << cutgen->indegree_counter << endl;
+            }
+
             // restore IP model
             model->set(GRB_IntParam_Cuts, -1);
             for (long u = 0; u < instance->graph->num_vertices; ++u)
                 for (long c = 0; c < instance->num_subgraphs; ++c)
                     x[u][c].set(GRB_CharAttr_VType, GRB_BINARY);
+
+            model->update();
 
             return true;
         }

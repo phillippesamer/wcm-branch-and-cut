@@ -1,0 +1,15 @@
+# with these weighs and k=1, msi and nonnegativity constraints give a perfect
+# description of the connected subgraph polytope of K_4-e, but the indegree 
+# relaxation is fractional.
+diamond.gcc
+4
+5
+0 1
+0 2
+0 3
+1 3
+2 3
+1
+-2
+-2
+1

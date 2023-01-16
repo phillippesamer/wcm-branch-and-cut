@@ -11,8 +11,9 @@ bool CUTS_AT_ROOT_ONLY = false;
 bool SEARCH_ALL_COLOURS_FOR_INDEGREE = true;
 bool SEARCH_ALL_COLOURS_FOR_MSI = true;
 
-// at most 14 without changing everything to long double (which gurobi ignores)
-#define SEPARATION_PRECISION_IN_IP 14
+// at most 16 without changing everything to long double (which gurobi ignores)
+bool SET_MAX_PRECISION_IN_SEPARATION = false;
+int  SEPARATION_PRECISION = 16;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -98,7 +99,8 @@ void CKSCutGenerator::callback()
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getNodeRel(x_vars[u], num_subgraphs);
 
-            clean_x_val_beyond_precision(SEPARATION_PRECISION_IN_IP);
+            if (SET_MAX_PRECISION_IN_SEPARATION)
+                clean_x_val_beyond_precision(SEPARATION_PRECISION);
 
             bool model_updated = false;
 
@@ -121,7 +123,8 @@ void CKSCutGenerator::callback()
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getSolution(x_vars[u], num_subgraphs);
 
-            clean_x_val_beyond_precision(SEPARATION_PRECISION_IN_IP);
+            if (SET_MAX_PRECISION_IN_SEPARATION)
+                clean_x_val_beyond_precision(SEPARATION_PRECISION);
 
             bool model_updated = false;
 
@@ -163,7 +166,8 @@ bool CKSCutGenerator::separate_lpr()
                 x_val[u][c] = x_vars[u][c].get(GRB_DoubleAttr_X);
         }
 
-        clean_x_val_beyond_precision(SEPARATION_PRECISION_IN_IP);
+        if (SET_MAX_PRECISION_IN_SEPARATION)
+            clean_x_val_beyond_precision(SEPARATION_PRECISION);
 
         bool model_updated = false;
 
