@@ -3,6 +3,7 @@
 /// algorithm setup switches
 
 bool CHECK_SOLUTION = true;            // check if the k subgraphs are connected
+bool ORDER_COLOURS_CONSTRAINTS = true; // reduces solution symmetry
 
 CKSModel::CKSModel(IO *instance)
 {
@@ -81,6 +82,30 @@ void CKSModel::create_constraints()
         cname.str("");
         cname << "C1_GUB_" << u;
         model->addConstr(gub_ineq <= 1, cname.str());
+    }
+
+    if (ORDER_COLOURS_CONSTRAINTS)
+    {
+        /***
+         * Reduces symmetry by imposing that the component induced by colour c
+         * is larger than that induced by colour c+1. Also avoids solutions with
+         * "empty components" between non-empty ones.
+         */
+        for (long c = 0; c < instance->num_subgraphs - 1; ++c)
+        {
+            GRBLinExpr order_ineq = 0;
+
+            // vertices in c - vertices in c+1
+            for (long u = 0; u < instance->graph->num_vertices; ++u)
+            {
+                order_ineq += x[u][c];
+                order_ineq += (-1)*x[u][c+1];
+            }
+
+            cname.str("");
+            cname << "C2_ORDER_" << c;
+            model->addConstr(order_ineq >= 0, cname.str());
+        }
     }
 
     model->update();
