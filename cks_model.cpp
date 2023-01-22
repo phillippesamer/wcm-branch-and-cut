@@ -4,7 +4,6 @@
 
 bool CHECK_SOLUTION = true;            // check if the k subgraphs are connected
 
-
 CKSModel::CKSModel(IO *instance)
 {
     this->instance = instance;

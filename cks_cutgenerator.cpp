@@ -357,18 +357,12 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
         // maps u->u_1 ; u_2 = D_idx_of_vertex[u]+1 for fractional x_val[u]
         vector<long> D_idx_of_vertex = vector<long>(num_vertices, -1);
 
-        // 1.1 ADD VERTICES CORRESPONDING TO VARS IN [0,1) IN THIS RELAXATION
+        // 1.1 ADD VERTICES CORRESPONDING TO VARS IN (0,1) IN THIS RELAXATION
         for (long u = 0; u < num_vertices; ++u)
         {
             const double value = x_val[u][colour];
-            if (value == 0)
-            {
-                // add only one vertex u_1 = u_2 in D
-                D_vertices.push_back(D.addNode());
-                D_idx_of_vertex[u] = D_size;
-                ++D_size;
-            }
-            else if(value > 0 && value < 1)
+
+            if (value > 0 && value < 1)
             {
                 // add two vertices u_1, u_2 in D
                 D_vertices.push_back(D.addNode());
@@ -381,7 +375,7 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
 
                 D_size += 2;
             }
-            else // value == 1
+            else if (value == 1)
                 vars_at_one.push_back(u);
         }
 
@@ -440,68 +434,21 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             D_capacity[ D_arcs[v1v2] ] = fractional_vars_val.at(idx);
         }
 
-        // 1.4 REMAINING ARCS, WITH UNLIMITED CAPACITY (2 SUFFICES HERE!)
+        // 1.4 REMAINING ARCS, WITH UNLIMITED CAPACITY (|V|+1 SUFFICES HERE!)
 
         const long num_edges = instance->graph->num_edges;
-        const long UNLIMITED_CAPACITY = 2;
+        const long UNLIMITED_CAPACITY = num_vertices + 1;
 
         for (long idx = 0; idx < num_edges; ++idx)
         {
             long u = instance->graph->s.at(idx);
             long v = instance->graph->t.at(idx);
 
-            // the actual arcs (one or two, for each original edge) depend on
-            // the reductions due to integral valued vars (7 cases... boring!)
-            if (x_val[u][colour] == 1 && x_val[v][colour] == 0)
+            // two new arcs, observing reductions due to vars at 1
+            if (x_val[u][colour] > 0 && x_val[v][colour] == 1 &&
+                x_val[u][colour] < 1)
             {
                 // CASE 1
-                long uu = D_idx_of_vertex[u];
-                long vv = D_idx_of_vertex[v];
-                pair<long,long> uuvv = make_pair(uu,vv);
-
-                D_arcs[uuvv] = D.addArc(D_vertices[uu], D_vertices[vv]);
-
-                D_capacity[ D_arcs[uuvv] ] = UNLIMITED_CAPACITY;
-            }
-            else if (x_val[u][colour] == 0 && x_val[v][colour] == 1)
-            {
-                // CASE 2
-                long uu = D_idx_of_vertex[u];
-                long vv = D_idx_of_vertex[v];
-                pair<long,long> vvuu = make_pair(vv,uu);
-
-                D_arcs[vvuu] = D.addArc(D_vertices[vv], D_vertices[uu]);
-
-                D_capacity[ D_arcs[vvuu] ] = UNLIMITED_CAPACITY;
-            }
-            else if (x_val[u][colour] == 0 && x_val[v][colour] > 0
-                                           && x_val[v][colour] < 1)
-            {
-                // CASE 3
-                long uu = D_idx_of_vertex[u];
-                long v2 = D_idx_of_vertex[v] + 1;
-                pair<long,long> v2uu = make_pair(v2,uu);
-
-                D_arcs[v2uu] = D.addArc(D_vertices[v2], D_vertices[uu]);
-
-                D_capacity[ D_arcs[v2uu] ] = UNLIMITED_CAPACITY;
-            }
-            else if (x_val[u][colour] > 0 && x_val[v][colour] == 0 &&
-                     x_val[u][colour] < 1)
-            {
-                // CASE 4
-                long u2 = D_idx_of_vertex[u] + 1;
-                long vv = D_idx_of_vertex[v];
-                pair<long,long> u2vv = make_pair(u2,vv);
-
-                D_arcs[u2vv] = D.addArc(D_vertices[u2], D_vertices[vv]);
-
-                D_capacity[ D_arcs[u2vv] ] = UNLIMITED_CAPACITY;
-            }
-            else if (x_val[u][colour] > 0 && x_val[v][colour] == 1 &&
-                     x_val[u][colour] < 1)
-            {
-                // CASE 5
                 long u1 = D_idx_of_vertex[u];
                 long u2 = D_idx_of_vertex[u] + 1;
                 long vv = D_idx_of_vertex[v];
@@ -517,7 +464,7 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             else if (x_val[u][colour] == 1 && x_val[v][colour] > 0
                                            && x_val[v][colour] < 1)
             {
-                // CASE 6
+                // CASE 2
                 long uu = D_idx_of_vertex[u];
                 long v1 = D_idx_of_vertex[v];
                 long v2 = D_idx_of_vertex[v] + 1;
@@ -533,7 +480,7 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             else if (x_val[u][colour] > 0 && x_val[v][colour] > 0 &&
                      x_val[u][colour] < 1 && x_val[v][colour] < 1  )
             {
-                // CASE 7
+                // CASE 3
                 long u1 = D_idx_of_vertex[u];
                 long u2 = D_idx_of_vertex[u] + 1;
                 long v1 = D_idx_of_vertex[v];
@@ -563,10 +510,14 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             long t = s+1;
             while (t < num_vertices && !done_with_this_colour)
             {
-                // account for possible contractions due to integral x_(t,c)
-                long s_in_D = D_idx_of_vertex[s];
-                long t_in_D = (x_val[t][colour] == 1) ? D_idx_of_vertex[t]
-                                                      : D_idx_of_vertex[t] + 1;
+                // account for possible contractions due to x_(s,c) = 1
+
+                // wanted: a (s_2, t_1) separating cut (careful: -1 if var at 0)
+                long s_in_D = (x_val[s][colour] > 0 && x_val[s][colour] < 1) ?
+                    D_idx_of_vertex[s]+1 : D_idx_of_vertex[s];
+
+                long t_in_D = D_idx_of_vertex[t];
+
 
                 if ( instance->graph->index_matrix[s][t] < 0 &&  // non-adjacent
                      x_val[s][colour] + x_val[t][colour] > 1 &&  // might cut x*
@@ -603,21 +554,13 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                         {
                             long u_in_D = D_idx_of_vertex[u];
 
-                            // query if u1 is on the source side of the min cut
-                            if ( s_t_preflow.minCut(D_vertices[u_in_D]) )
+                            // u1 frac. and on the source side of the min cut
+                            if ( x_val[u][colour] > 0 && x_val[u][colour] < 1 &&
+                                 s_t_preflow.minCut(D_vertices[u_in_D]) )
                             {
-                                bool u_at_zero = x_val[u][colour] == 0;
+                                long u2_in_D = D_idx_of_vertex[u] + 1;
 
-                                bool u_frac = x_val[u][colour] > 0 &&
-                                              x_val[u][colour] < 1 ;
-
-                                long u2_in_D = u_frac ? D_idx_of_vertex[u] + 1
-                                                      : D_idx_of_vertex[u];
-
-                                bool u2_separated =
-                                    ! s_t_preflow.minCut(D_vertices[u2_in_D]);
-
-                                if (u_at_zero || (u_frac && u2_separated) )
+                                if ( !s_t_preflow.minCut(D_vertices[u2_in_D]) )
                                     S.push_back(u);
                             }
                         }

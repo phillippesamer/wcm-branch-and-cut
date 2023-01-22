@@ -11,7 +11,7 @@ else
     GRB_LINK    = -L$(GRB_PATH)/lib/ -lgurobi_g++5.2 -lgurobi100
 endif
 
-CC          = g++ -Wall -Wextra -O3 -m64 -DDEBUG -DDEBUG_LPR
+CC          = g++ -Wall -Wextra -O3 -m64 -g -DDEBUG -DDEBUG_LPR
 
 FILES_CC    = graph.cpp io.cpp cks_model.cpp cks_cutgenerator.cpp main.cpp
 
