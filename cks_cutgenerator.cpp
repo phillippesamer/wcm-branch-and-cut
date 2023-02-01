@@ -1,9 +1,12 @@
 #include "cks_cutgenerator.h"
 
+// TO DO: REMOVE ME
+#include <cassert>
+
 /// algorithm setup switches
 
 bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
-bool SEPARATE_INDEGREE = true;
+bool SEPARATE_INDEGREE = false;
 
 bool CUTS_AT_ROOT_ONLY = false;
 
@@ -549,6 +552,7 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                         // TO ARCS IN THE MIN CUT
 
                         vector<long> S = vector<long>();
+                        vector<bool> S_mask = vector<bool>(num_vertices, false);
 
                         for (long u = 0; u < num_vertices; ++u)
                         {
@@ -561,13 +565,21 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                                 long u2_in_D = D_idx_of_vertex[u] + 1;
 
                                 if ( !s_t_preflow.minCut(D_vertices[u2_in_D]) )
+                                {
                                     S.push_back(u);
+                                    S_mask.at(u) = true;
+
+                                    // TO DO: REMOVE ME
+                                    assert(u != s);
+                                    assert(u != t);
+                                }
                             }
                         }
 
                         // TO DO: ASSERT VIOLATED INEQUALITY
 
-                        // TO DO: 6. LIFT VIOLATED INEQUALITY BY REDUCING S
+                        // 6. LIFT CUT BY REDUCING S TO A MINIMAL SEPARATOR
+                        lift_to_minimal_separator(S, S_mask, s, t);
 
                         // 7. DETERMINE INEQUALITY
 
@@ -602,4 +614,88 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
     }
 
     return (cuts_lhs.size() > 0);
+}
+
+void inline CKSCutGenerator::lift_to_minimal_separator(vector<long> &S,
+                                                       vector<bool> &S_mask,
+                                                       long s,
+                                                       long t)
+{
+    /// Remove vertices from S until it is a minimal (s,t)-separator
+
+    bool updated = true;
+    while (updated)
+    {
+        updated = false;
+
+        const long len = S.size();
+
+        long count = 0;
+        vector<bool> seen = vector<bool>(num_vertices, false);
+
+        // only try dfs from t if dfs from s found all vertices of S 
+        dfs_avoiding_set(S, S_mask, s, seen, count);
+        if (count == len)
+        {
+            count = 0;
+            seen.assign(num_vertices, false);
+            dfs_avoiding_set(S, S_mask, t, seen, count);
+        }
+
+        /***
+         * S is a minimal (s,t)-separator if and only if every element in S has
+         * a neighbour both in the connected component of G-S containing s, and  
+         * in the one containing t. So we may remove from S a vertex not found
+         * in either dfs' above.
+         */
+        if (count < len)
+        {
+            long i = 0;
+            while (i < len && !updated)
+            {
+                long vertex_at_i = S.at(i);
+
+                if ( !seen.at(vertex_at_i) )
+                {
+                    updated = true;
+                    S.erase(S.begin() + i);
+                    S_mask.at(vertex_at_i) = false;
+                }
+
+                ++i;
+            }
+        }
+
+    }  // repeat search if S was updated 
+}
+
+void inline CKSCutGenerator::dfs_avoiding_set(vector<long> &S,
+                                              vector<bool> &S_mask,
+                                              long source,
+                                              vector<bool> &seen,
+                                              long &count)
+{
+    // auxiliary dfs tagging seen vertices, but not exploring vertices in S
+
+    // NB! Expecting 'seen' with num_vertices 'false' entries (not S.size()!)
+
+    seen.at(source) = true;
+
+    for (list<long>::iterator it = instance->graph->adj_list.at(source).begin();
+        it != instance->graph->adj_list.at(source).end(); ++it)
+    {
+        long v = *it;
+
+        if ( !seen.at(v) )
+        {
+            if ( S_mask.at(v) )
+            {
+                // v in S
+                seen.at(v) = true;
+                ++count;
+            }
+            else
+                dfs_avoiding_set(S, S_mask, v, seen, count);
+        }
+    }
 }

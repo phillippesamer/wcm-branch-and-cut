@@ -65,6 +65,15 @@ protected:
     long minimal_separators_counter;
     bool run_minimal_separators_separation(int);
     bool separate_minimal_separators(vector<GRBLinExpr> &, vector<long> &);
+    void inline lift_to_minimal_separator(vector<long> &,
+                                          vector<bool> &,
+                                          long,
+                                          long);
+    void inline dfs_avoiding_set(vector<long> &,
+                                 vector<bool> &,
+                                 long,
+                                 vector<bool> &,
+                                 long &);
 };
 
 #endif
