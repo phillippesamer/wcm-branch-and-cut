@@ -119,11 +119,26 @@ void CKSModel::create_objective()
 
     GRBLinExpr objective_expression = 0;
 
-    for (long u = 0; u < instance->graph->num_vertices; ++u)
-        for (long c = 0; c < instance->num_subgraphs; ++c)
-            objective_expression += (instance->graph->w[u]) * x[u][c];
+    if (instance->recoloring_instance == true)
+    {
+        for (long u = 0; u < instance->graph->num_vertices; ++u)
+        {
+            long c = instance->original_colouring.at(u);
+            double w = instance->graph->w.at(u);
+            objective_expression += (w * x[u][c]);
+        }
 
-    model->setObjective(objective_expression, GRB_MINIMIZE);
+        model->setObjective(objective_expression, GRB_MAXIMIZE);
+    }
+    else
+    {
+        for (long u = 0; u < instance->graph->num_vertices; ++u)
+            for (long c = 0; c < instance->num_subgraphs; ++c)
+                objective_expression += (instance->graph->w[u]) * x[u][c];
+
+        model->setObjective(objective_expression, GRB_MINIMIZE);
+    }
+
     model->update();
 }
 

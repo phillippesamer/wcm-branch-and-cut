@@ -6,7 +6,7 @@
 /// algorithm setup switches
 
 bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
-bool SEPARATE_INDEGREE = false;
+bool SEPARATE_INDEGREE = true;
 
 bool CUTS_AT_ROOT_ONLY = false;
 

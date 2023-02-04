@@ -28,10 +28,15 @@ public:
     IO();
     virtual ~IO();
     
-    bool parse_input_file(string);
+    bool parse_single_weight_input_file(string);
+    bool parse_CR_input_file(string);
 
     // instance data
     long num_subgraphs;
+
+    bool recoloring_instance;
+    vector<long> original_colouring;
+
     string instance_id;
     string instance_id_trimmed;
 

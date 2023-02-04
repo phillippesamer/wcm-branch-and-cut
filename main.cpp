@@ -17,7 +17,7 @@
 using namespace std;
 
 // execution switches
-double RUN_CKS_WITH_TIME_LIMIT = 3600;
+double RUN_CKS_WITH_TIME_LIMIT = 1800;
 
 int main(int argc, char **argv)
 {
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     IO* instance = new IO();
     instance->num_subgraphs = atol(argv[2]);
 
-    if (instance->parse_input_file(string(argv[1])) == false)
+    if (instance->parse_CR_input_file(string(argv[1])) == false)
     {
         cout << "unable to parse input file" << endl;
         delete instance;
