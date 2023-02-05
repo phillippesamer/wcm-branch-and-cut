@@ -1,8 +1,5 @@
 #include "cks_cutgenerator.h"
 
-// TO DO: REMOVE ME
-#include <cassert>
-
 /// algorithm setup switches
 
 bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
@@ -14,9 +11,9 @@ bool CUTS_AT_ROOT_ONLY = false;
 bool SEARCH_ALL_COLOURS_FOR_INDEGREE = true;
 bool SEARCH_ALL_COLOURS_FOR_MSI = true;
 
-// at most 16 without changing everything to long double (which gurobi ignores)
-bool SET_MAX_PRECISION_IN_SEPARATION = false;
-int  SEPARATION_PRECISION = 16;
+// at most 14 without changing everything to long double (which gurobi ignores)
+bool SET_MAX_PRECISION_IN_SEPARATION = true;
+int  SEPARATION_PRECISION = 14;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -102,16 +99,16 @@ void CKSCutGenerator::callback()
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getNodeRel(x_vars[u], num_subgraphs);
 
-            if (SET_MAX_PRECISION_IN_SEPARATION)
-                clean_x_val_beyond_precision(SEPARATION_PRECISION);
-
-            bool model_updated = false;
-
             if (SEPARATE_INDEGREE)
-                model_updated = run_indegree_separation(ADD_USER_CUTS);
+                run_indegree_separation(ADD_USER_CUTS);
 
-            if (!model_updated && SEPARATE_MSI)
+            if (SEPARATE_MSI)
+            {
+                if (SET_MAX_PRECISION_IN_SEPARATION)
+                    clean_x_val_beyond_precision(SEPARATION_PRECISION);
+
                 run_minimal_separators_separation(ADD_USER_CUTS);
+            }
 
             for (long u=0; u < num_vertices; u++)
                 delete[] x_val[u];
@@ -126,16 +123,16 @@ void CKSCutGenerator::callback()
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getSolution(x_vars[u], num_subgraphs);
 
-            if (SET_MAX_PRECISION_IN_SEPARATION)
-                clean_x_val_beyond_precision(SEPARATION_PRECISION);
-
-            bool model_updated = false;
-
             if (SEPARATE_INDEGREE)
-                model_updated = run_indegree_separation(ADD_LAZY_CNTRS);
+                run_indegree_separation(ADD_LAZY_CNTRS);
 
-            if (!model_updated && SEPARATE_MSI)
+            if (SEPARATE_MSI)
+            {
+                if (SET_MAX_PRECISION_IN_SEPARATION)
+                    clean_x_val_beyond_precision(SEPARATION_PRECISION);
+
                 run_minimal_separators_separation(ADD_LAZY_CNTRS);
+            }
 
             for (long u=0; u < num_vertices; u++)
                 delete[] x_val[u];
@@ -265,7 +262,7 @@ bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
         {
             long u = instance->graph->s.at(idx);
             long v = instance->graph->t.at(idx);
-            if (x_val[u][colour] > x_val[v][colour])
+            if (x_val[u][colour] > x_val[v][colour] + EPSILON_TOL)
                 indegree.at(v) += 1;
             else
                 indegree.at(u) += 1;
@@ -277,7 +274,7 @@ bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
             lhs_sum += ( (1 - indegree.at(u)) * x_val[u][colour] );
 
         // 3. FOUND MOST VIOLATED INDEGREE INEQUALITY (IF ANY) IF LHS > 1
-        if (lhs_sum > 1)
+        if (lhs_sum > 1 + EPSILON_TOL)
         {
             // store inequality (caller method adds it to the model)
             GRBLinExpr violated_constr = 0;
@@ -606,30 +603,29 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
 
                         for (long u = 0; u < num_vertices; ++u)
                         {
-                            long u_in_D = D_idx_of_vertex[u];
-
-                            // query if u1 is on the source side of the min cut
-                            if ( s_t_preflow.minCut(D_vertices[u_in_D]) )
+                            if (u != s && u != t)
                             {
-                                bool u_at_zero = x_val[u][colour] == 0;
+                                long u_in_D = D_idx_of_vertex[u];
 
-                                bool u_frac = x_val[u][colour] > 0 &&
-                                              x_val[u][colour] < 1 ;
-
-                                long u2_in_D = u_frac ? D_idx_of_vertex[u] + 1
-                                                      : D_idx_of_vertex[u];
-
-                                bool u2_separated =
-                                    ! s_t_preflow.minCut(D_vertices[u2_in_D]);
-
-                                if (u_at_zero || (u_frac && u2_separated) )
+                                // query if u1 is on the source side of the min cut
+                                if ( s_t_preflow.minCut(D_vertices[u_in_D]) )
                                 {
-                                    S.push_back(u);
-                                    S_mask.at(u) = true;
+                                    bool u_at_zero = x_val[u][colour] == 0;
 
-                                    // TO DO: REMOVE ME
-                                    assert(u != s);
-                                    assert(u != t);
+                                    bool u_frac = x_val[u][colour] > 0 &&
+                                                  x_val[u][colour] < 1 ;
+
+                                    long u2_in_D = u_frac ? D_idx_of_vertex[u]+1
+                                                          : D_idx_of_vertex[u];
+
+                                    bool u2_separated =
+                                       !s_t_preflow.minCut(D_vertices[u2_in_D]);
+
+                                    if (u_at_zero || (u_frac && u2_separated) )
+                                    {
+                                        S.push_back(u);
+                                        S_mask.at(u) = true;
+                                    }
                                 }
                             }
                         }

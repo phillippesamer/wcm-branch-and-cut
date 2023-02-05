@@ -3,7 +3,7 @@
 /// algorithm setup switches
 
 bool CHECK_SOLUTION = true;            // check if the k subgraphs are connected
-bool ORDER_COLOURS_CONSTRAINTS = true; // reduces solution symmetry
+bool ORDER_COLOURS_CONSTRAINTS = false; // reduces solution symmetry
 
 CKSModel::CKSModel(IO *instance)
 {
@@ -61,7 +61,7 @@ void CKSModel::create_variables()
         for (long c = 0; c < instance->num_subgraphs; ++c)
         {
             sprintf(buffer, "x_%ld_%ld", u, c);
-            x[u][c] = model->addVar(0.0, 1.0, 1.0, GRB_BINARY, buffer);
+            x[u][c] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, buffer);
         }
     }
 
