@@ -17,7 +17,12 @@
 using namespace std;
 
 // execution switches
+bool CONVEX_RECOLORING_INSTANCE = true;   // e.g. as of ITOR'2020
+
 double RUN_CKS_WITH_TIME_LIMIT = 1800;
+
+bool WRITE_LATEX_TABLE_ROW = true;
+string LATEX_TABLE_FILE_PATH = string("xp1table.dat");
 
 int main(int argc, char **argv)
 {
@@ -27,57 +32,71 @@ int main(int argc, char **argv)
 
     if (argc == 3)
     {
-        instance->num_subgraphs = atol(argv[2]);
-
-        if (instance->parse_single_weight_input_file(string(argv[1])) == false)
+        if (CONVEX_RECOLORING_INSTANCE)
         {
-            cout << "unable to parse input file" << endl;
-            delete instance;
-            return 0;
+            cout << "convex recoloring" << endl;
+            if (instance->parse_CR_input_file(string(argv[1])) == false)
+            {
+                cout << "unable to parse CR input file" << endl;
+                delete instance;
+                return 0;
+            }
         }
-    }
-    else if (argc == 2)
-    {
-        cout << "convex recoloring" << endl;
-        if (instance->parse_CR_input_file(string(argv[1])) == false)
+        else
         {
-            cout << "unable to parse CR input file" << endl;
-            delete instance;
-            return 0;
+            instance->num_subgraphs = atol(argv[2]);
+
+            if ( !instance->parse_single_weight_input_file(string(argv[1])) )
+            {
+                cout << "unable to parse input file" << endl;
+                delete instance;
+                return 0;
+            }
         }
     }
     else
     {
         cout << "usage: \t" << argv[0]
+             << " [CR instance file] [CR solution file]" << endl << endl;
+        cout << "or" << endl << endl;
+        cout << "       \t" << argv[0]
              << " [input file path] [number of subgraphs]" << endl << endl;
-        cout << "assuming a CR instance if the number of subgraphs is not given"
-             << endl;
 
         delete instance;
         return 0;
     }
 
-    // 1. BUILD AND SOLVE CORRESPONDING IP MODEL
+    if (WRITE_LATEX_TABLE_ROW)
+    {
+        instance->save_instance_info();
+        instance->save_literature_info(string(argv[2]));
+    }
+
+    // 1. BUILD AND SOLVE THE INTEGER PROGRAM
 
     CKSModel *model = new CKSModel(instance);
+
+    model->solve_lp_relax(true);
+
+    if (WRITE_LATEX_TABLE_ROW)
+        instance->save_lpr_info(model->lp_bound, model->lp_runtime);
+
     model->set_time_limit(RUN_CKS_WITH_TIME_LIMIT);
-
-    //model->solve_lp_relax(true);
-
     model->solve(true);
 
-    cout << "_____________________________________________________________________________" << endl << endl;
+    if (WRITE_LATEX_TABLE_ROW)
+    {
+        instance->save_ip_info(model->solution_weight,
+                               model->solution_dualbound,
+                               model->get_mip_gap(),
+                               model->get_mip_runtime(),
+                               model->get_mip_num_nodes(),
+                               model->get_mip_msi_counter(),
+                               model->get_mip_indegree_counter());
 
-    cout << "cks weight: " << model->solution_dualbound
-         << " (runtime " << fixed << model->solution_runtime << ")";
-    if (model->solution_status != AT_OPTIMUM)
-        cout << " *** NOT OPTIMAL ***";
-    cout << endl;
+        instance->write_summary_info(LATEX_TABLE_FILE_PATH);
+    }
 
-    cout << "_____________________________________________________________________________" << endl << endl;
-    /*
-    */
-    
     delete model;
     delete instance;
     return 0;

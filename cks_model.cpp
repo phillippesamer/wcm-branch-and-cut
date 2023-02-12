@@ -113,10 +113,6 @@ void CKSModel::create_constraints()
 
 void CKSModel::create_objective()
 {
-    // TO DO: in the convex recoloring application, change to maximization and
-    // color-dependent weights: w[u][c] = w(u) if c is the original colour of u;
-    // w[u][c] = 0 otherwise
-
     GRBLinExpr objective_expression = 0;
 
     if (instance->recoloring_instance == true)
@@ -520,12 +516,32 @@ bool CKSModel::solve_lp_relax(bool logging)
     }
 }
 
-double CKSModel::runtime()
+void CKSModel::set_time_limit(double tl)
+{
+    model->set(GRB_DoubleParam_TimeLimit, tl);
+}
+
+double CKSModel::get_mip_runtime()
 {
     return model->get(GRB_DoubleAttr_Runtime);
 }
 
-void CKSModel::set_time_limit(double tl)
+double CKSModel::get_mip_gap()
 {
-    model->set(GRB_DoubleParam_TimeLimit, tl);
+    return model->get(GRB_DoubleAttr_MIPGap);
+}
+
+long CKSModel::get_mip_num_nodes()
+{
+    return model->get(GRB_DoubleAttr_NodeCount);
+}
+
+long CKSModel::get_mip_msi_counter()
+{
+    return cutgen->minimal_separators_counter;
+}
+
+long CKSModel::get_mip_indegree_counter()
+{
+    return cutgen->indegree_counter;
 }

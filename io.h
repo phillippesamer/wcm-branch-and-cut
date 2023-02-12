@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <vector>
 #include <cstring>
 #include <algorithm>
@@ -27,9 +28,15 @@ class IO
 public:
     IO();
     virtual ~IO();
-    
+
     bool parse_single_weight_input_file(string);
     bool parse_CR_input_file(string);
+
+    void save_instance_info();
+    void save_literature_info(string);
+    void save_lpr_info(double, double);
+    void save_ip_info(double, double, double, double, long, long, long);
+    void write_summary_info(string);
 
     // instance data
     long num_subgraphs;
@@ -43,6 +50,8 @@ public:
 private:
     friend class CKSModel;
     friend class CKSCutGenerator;
+
+    stringstream summary_info;  // latex table row summary
 
     Graph *graph;  // different representations of the original graph
 };

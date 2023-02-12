@@ -2,6 +2,8 @@
 
 IO::IO()
 {
+    summary_info = stringstream();
+
     // only for consistency (while an input parsing method is not called)
     this->graph = new Graph();
     this->num_subgraphs = 1;
@@ -192,4 +194,124 @@ bool IO::parse_CR_input_file(string filename)
     graph->init_lemon();
 
     return true;
+}
+
+void IO::save_instance_info()
+{
+    /// save instance info: id  n  m  k
+    summary_info << left;
+    summary_info << setw(15) << instance_id_trimmed;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << graph->num_vertices;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << graph->num_edges;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << num_subgraphs;
+    summary_info << setw(8) << "  &&  ";
+
+    #ifdef DEBUG
+        cout << "save_instance_info got: " << endl;
+        cout << summary_info.str() << endl;
+    #endif
+}
+
+void IO::save_literature_info(string filename)
+{
+    /// save literature info (ITOR'2020): lb, gap, time
+
+    ifstream input_fh(filename);
+    
+    if (input_fh.is_open())
+    {
+        string id;
+        double time, gap;
+        long recolored_vertices;
+
+        input_fh >> id;
+        input_fh >> time;
+        input_fh >> gap;
+        input_fh >> recolored_vertices;
+
+        // the authors informed the number of recolored vertices (not kept ones)
+        long bound_from_literature = graph->num_vertices - recolored_vertices;
+
+        summary_info << setw(8) << bound_from_literature;
+        summary_info << setw(8) << "  &  ";
+        summary_info << setw(8) << fixed << setprecision(2) << gap;
+        summary_info << setw(8) << "  &  ";
+        summary_info << setw(8) << fixed << setprecision(2) << time;
+        summary_info << setw(8) << "  &&  ";
+
+        input_fh.close();
+    }
+    else
+        cerr << "ERROR: could not open CR solution file." << endl;
+
+    #ifdef DEBUG
+        cout << "save_literature_info got: " << endl;
+        cout << summary_info.str() << endl;
+    #endif
+}
+
+void IO::save_lpr_info(double lp_bound, double lp_time)
+{
+    /// save lp relaxation info: bound time
+    summary_info << setw(8) << fixed << setprecision(2) << lp_bound;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << fixed << setprecision(2) << lp_time;
+    summary_info << setw(8) << "  &&  ";
+
+    #ifdef DEBUG
+        cout << "save_lpr_info got: " << endl;
+        cout << summary_info.str() << endl;
+    #endif
+}
+
+void IO::save_ip_info(double lb,
+                      double ub,
+                      double gap,
+                      double time,
+                      long node_count,
+                      long msi_count,
+                      long indegree_count)
+{
+    /// save mip info: lb ub gap time #nodes #msi #indegree
+
+    summary_info << setw(8) << fixed << setprecision(2) << lb;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << fixed << setprecision(2) << ub;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << fixed << setprecision(2) << gap;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << fixed << setprecision(2) << time;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << node_count;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << msi_count;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << indegree_count;
+    summary_info << setw(8) << "  \\  ";
+
+    #ifdef DEBUG
+        cout << "save_ip_info got: " << endl;
+        cout << summary_info.str() << endl;
+    #endif
+}
+
+void IO::write_summary_info(string output_file_path)
+{
+    /// write all the saved info as a line in the given file
+
+    ofstream xpfile(output_file_path.c_str(), ofstream::app);
+    if (xpfile.is_open())
+    {
+        xpfile << summary_info.str();
+        xpfile << endl;
+        xpfile.close();
+    }
+    else
+    {
+        cout << "ERROR: unable to write XP file; dumping to screen:" << endl;
+        cout << summary_info.str();
+    }
 }

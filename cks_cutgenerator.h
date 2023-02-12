@@ -42,8 +42,6 @@ public:
 
 protected:
     friend class CKSModel;
-    friend class violated_separator;
-    friend class violated_indegree;
 
     void callback();
     bool separate_lpr();

@@ -47,8 +47,14 @@ public:
     double lp_runtime;
     long lp_passes;
 
-    double runtime();
     void set_time_limit(double);
+
+    // further info methods
+    double get_mip_runtime();
+    double get_mip_gap();
+    long get_mip_num_nodes();
+    long get_mip_msi_counter();
+    long get_mip_indegree_counter();
 
 protected:
     IO *instance;
