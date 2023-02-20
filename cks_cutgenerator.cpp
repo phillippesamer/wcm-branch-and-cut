@@ -14,6 +14,7 @@ bool SEARCH_ALL_COLOURS_FOR_MSI = true;
 // at most 14 without changing everything to long double (which gurobi ignores)
 bool SET_MAX_PRECISION_IN_SEPARATION = true;
 int  SEPARATION_PRECISION = 14;
+double MSI_VIOLATION_TOL = 1e-10;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -166,22 +167,25 @@ bool CKSCutGenerator::separate_lpr()
                 x_val[u][c] = x_vars[u][c].get(GRB_DoubleAttr_X);
         }
 
-        if (SET_MAX_PRECISION_IN_SEPARATION)
-            clean_x_val_beyond_precision(SEPARATION_PRECISION);
-
-        bool model_updated = false;
+        bool indegree_cut = false;
+        bool msi_cut = false;
 
         if (SEPARATE_INDEGREE)
-            model_updated = run_indegree_separation(ADD_STD_CNTRS);
+            indegree_cut = run_indegree_separation(ADD_STD_CNTRS);
 
-        if (!model_updated && SEPARATE_MSI)
-            model_updated = run_minimal_separators_separation(ADD_STD_CNTRS);
+        if (SEPARATE_MSI)
+        {
+            if (SET_MAX_PRECISION_IN_SEPARATION)
+                clean_x_val_beyond_precision(SEPARATION_PRECISION);
+
+            msi_cut = run_minimal_separators_separation(ADD_STD_CNTRS);
+        }
 
         for (long u=0; u < num_vertices; u++)
             delete[] x_val[u];
         delete[] x_val;
 
-        return model_updated;
+        return (indegree_cut || msi_cut);
     }
     catch (GRBException e)
     {
@@ -590,10 +594,11 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                     
                     double mincut = s_t_preflow.flowValue();
 
-                    // 4. IF THE MAX FLOW (MIN CUT) IS LESS THAN WHAT THE
-                    // INEQUALITY PRESCRIBES, WE FOUND A CUT
+                    // 4. IF THE MIN CUT IS LESS THAN WHAT THE MSI PRESCRIBES
+                    // (UP TO A VIOLATION TOLERANCE), WE FOUND A CUT
 
-                    if (mincut < x_val[s][colour] + x_val[t][colour] - 1)
+                    if (mincut < x_val[s][colour] + x_val[t][colour] - 1 
+                                 - MSI_VIOLATION_TOL)
                     {
                         // 5. DETERMINE VERTICES IN ORIGINAL GRAPH CORRESPONDING
                         // TO ARCS IN THE MIN CUT
@@ -629,8 +634,6 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                                 }
                             }
                         }
-
-                        // TO DO: ASSERT VIOLATED INEQUALITY
 
                         // 6. LIFT CUT BY REDUCING S TO A MINIMAL SEPARATOR
                         #ifdef DEBUG_MSI
@@ -674,14 +677,26 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                         cuts_rhs.push_back(1);
 
                         #ifdef DEBUG_MSI
+                            double violating_lhs = 0;
+
                             cout << "### ADDED MSI: ";
+
                             cout << "x_" << s << " + x_" << t;
+                            violating_lhs += x_val[s][colour];
+                            violating_lhs += x_val[t][colour];
 
-                        for (vector<long>::iterator it = S.begin();
-                                                    it != S.end(); ++it)
-                            cout << " - x_" << *it << "";
+                            for (vector<long>::iterator it = S.begin();
+                                                        it != S.end(); ++it)
+                            {
+                                cout << " - x_" << *it << "";
+                                violating_lhs -= x_val[*it][colour];
+                            }
 
-                        cout << " <= 1" << endl;
+                            cout << " <= 1 " << endl;
+                            cout << right;
+                            cout << setw(80) << "(lhs at current point "
+                                 << violating_lhs << ")" << endl;
+                            cout << left;
                         #endif
 
                         done_with_this_colour = true;

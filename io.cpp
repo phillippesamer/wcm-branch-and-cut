@@ -290,7 +290,7 @@ void IO::save_ip_info(double lb,
     summary_info << setw(8) << msi_count;
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << indegree_count;
-    summary_info << setw(8) << "  \\  ";
+    summary_info << setw(8) << "  \\\\  ";
 
     #ifdef DEBUG
         cout << "save_ip_info got: " << endl;

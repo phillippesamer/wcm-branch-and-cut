@@ -56,10 +56,9 @@ int main(int argc, char **argv)
     }
     else
     {
-        cout << "usage: \t" << argv[0]
+        cout << endl << "usage: \t" << argv[0]
              << " [CR instance file] [CR solution file]" << endl << endl;
-        cout << "or" << endl << endl;
-        cout << "       \t" << argv[0]
+        cout << "or \t" << argv[0]
              << " [input file path] [number of subgraphs]" << endl << endl;
 
         delete instance;
@@ -76,11 +75,12 @@ int main(int argc, char **argv)
 
     CKSModel *model = new CKSModel(instance);
 
-    model->solve_lp_relax(true);
-
+    /*
+    model->solve_lp_relax(false);
     if (WRITE_LATEX_TABLE_ROW)
         instance->save_lpr_info(model->lp_bound, model->lp_runtime);
-
+    */
+    
     model->set_time_limit(RUN_CKS_WITH_TIME_LIMIT);
     model->solve(true);
 
