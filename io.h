@@ -35,7 +35,7 @@ public:
     void save_instance_info();
     void save_literature_info(string);
     void save_lpr_info(double, double);
-    void save_ip_info(double, double, double, double, long, long, long);
+    void save_ip_info(long, long, double, double, long, long, long);
     void write_summary_info(string);
 
     // instance data

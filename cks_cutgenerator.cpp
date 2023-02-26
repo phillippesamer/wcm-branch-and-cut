@@ -6,6 +6,7 @@ bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
 bool SEPARATE_INDEGREE = true;
 
 bool CUTS_AT_ROOT_ONLY = false;
+bool MSI_ONLY_IF_NO_INDEGREE = true;   // only used with SEPARATE_MSI == true
 
 // strategy for running separation algorithms for colour-specific inequalities
 bool SEARCH_ALL_COLOURS_FOR_INDEGREE = true;
@@ -100,15 +101,20 @@ void CKSCutGenerator::callback()
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getNodeRel(x_vars[u], num_subgraphs);
 
+            bool separated = false;
+
             if (SEPARATE_INDEGREE)
-                run_indegree_separation(ADD_USER_CUTS);
+                separated = run_indegree_separation(ADD_USER_CUTS);
 
             if (SEPARATE_MSI)
             {
-                if (SET_MAX_PRECISION_IN_SEPARATION)
-                    clean_x_val_beyond_precision(SEPARATION_PRECISION);
+                if (!MSI_ONLY_IF_NO_INDEGREE || !separated)
+                {
+                    if (SET_MAX_PRECISION_IN_SEPARATION)
+                        clean_x_val_beyond_precision(SEPARATION_PRECISION);
 
-                run_minimal_separators_separation(ADD_USER_CUTS);
+                    run_minimal_separators_separation(ADD_USER_CUTS);
+                }
             }
 
             for (long u=0; u < num_vertices; u++)
@@ -124,15 +130,20 @@ void CKSCutGenerator::callback()
             for (long u = 0; u < num_vertices; ++u)
                 x_val[u] = this->getSolution(x_vars[u], num_subgraphs);
 
+            bool separated = false;
+
             if (SEPARATE_INDEGREE)
-                run_indegree_separation(ADD_LAZY_CNTRS);
+                separated = run_indegree_separation(ADD_LAZY_CNTRS);
 
             if (SEPARATE_MSI)
             {
-                if (SET_MAX_PRECISION_IN_SEPARATION)
-                    clean_x_val_beyond_precision(SEPARATION_PRECISION);
+                if (!MSI_ONLY_IF_NO_INDEGREE || !separated)
+                {
+                    if (SET_MAX_PRECISION_IN_SEPARATION)
+                        clean_x_val_beyond_precision(SEPARATION_PRECISION);
 
-                run_minimal_separators_separation(ADD_LAZY_CNTRS);
+                    run_minimal_separators_separation(ADD_LAZY_CNTRS);
+                }
             }
 
             for (long u=0; u < num_vertices; u++)
@@ -175,10 +186,13 @@ bool CKSCutGenerator::separate_lpr()
 
         if (SEPARATE_MSI)
         {
-            if (SET_MAX_PRECISION_IN_SEPARATION)
-                clean_x_val_beyond_precision(SEPARATION_PRECISION);
+            if (!MSI_ONLY_IF_NO_INDEGREE || !indegree_cut)
+            {
+                if (SET_MAX_PRECISION_IN_SEPARATION)
+                    clean_x_val_beyond_precision(SEPARATION_PRECISION);
 
-            msi_cut = run_minimal_separators_separation(ADD_STD_CNTRS);
+                msi_cut = run_minimal_separators_separation(ADD_STD_CNTRS);
+            }
         }
 
         for (long u=0; u < num_vertices; u++)

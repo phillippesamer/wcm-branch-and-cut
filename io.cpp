@@ -267,8 +267,8 @@ void IO::save_lpr_info(double lp_bound, double lp_time)
     #endif
 }
 
-void IO::save_ip_info(double lb,
-                      double ub,
+void IO::save_ip_info(long lb,
+                      long ub,
                       double gap,
                       double time,
                       long node_count,
@@ -277,11 +277,14 @@ void IO::save_ip_info(double lb,
 {
     /// save mip info: lb ub gap time #nodes #msi #indegree
 
-    summary_info << setw(8) << fixed << setprecision(2) << lb;
+    summary_info << setw(8) << lb;
     summary_info << setw(8) << "  &  ";
-    summary_info << setw(8) << fixed << setprecision(2) << ub;
+    summary_info << setw(8) << ub;
+
+    double percentual_gap = 100 * gap;
     summary_info << setw(8) << "  &  ";
-    summary_info << setw(8) << fixed << setprecision(2) << gap;
+    summary_info << setw(8) << fixed << setprecision(2) << percentual_gap;
+
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << fixed << setprecision(2) << time;
     summary_info << setw(8) << "  &  ";
