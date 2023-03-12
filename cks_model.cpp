@@ -3,7 +3,7 @@
 /// algorithm setup switches
 
 bool CHECK_SOLUTION = true;            // check if the k subgraphs are connected
-bool ORDER_COLOURS_CONSTRAINTS = false; // reduces solution symmetry
+bool ORDER_COLOURS_CONSTRAINTS = true; // reduces solution symmetry
 
 CKSModel::CKSModel(IO *instance)
 {
@@ -132,7 +132,7 @@ void CKSModel::create_objective()
             for (long c = 0; c < instance->num_subgraphs; ++c)
                 objective_expression += (instance->graph->w[u]) * x[u][c];
 
-        model->setObjective(objective_expression, GRB_MINIMIZE);
+        model->setObjective(objective_expression, GRB_MAXIMIZE);
     }
 
     model->update();

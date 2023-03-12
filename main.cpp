@@ -17,12 +17,12 @@
 using namespace std;
 
 // execution switches
-bool CONVEX_RECOLORING_INSTANCE = true;   // e.g. as of ITOR'2020
+bool CONVEX_RECOLORING_INSTANCE = false;   // e.g. as of ITOR'2020
 
 double RUN_CKS_WITH_TIME_LIMIT = 1800;
 
 bool WRITE_LATEX_TABLE_ROW = true;
-string LATEX_TABLE_FILE_PATH = string("xp3table.dat");
+string LATEX_TABLE_FILE_PATH = string("xp4table.dat");
 
 int main(int argc, char **argv)
 {
