@@ -17,12 +17,12 @@
 using namespace std;
 
 // execution switches
-bool CONVEX_RECOLORING_INSTANCE = false;   // e.g. as of ITOR'2020
+bool CONVEX_RECOLORING_INSTANCE = false;   // e.g. as of ITOR'2022
 
 double RUN_CKS_WITH_TIME_LIMIT = 1800;
 
 bool WRITE_LATEX_TABLE_ROW = true;
-string LATEX_TABLE_FILE_PATH = string("xp4table.dat");
+string LATEX_TABLE_FILE_PATH = string("xp6table.dat");
 
 int main(int argc, char **argv)
 {
@@ -68,7 +68,8 @@ int main(int argc, char **argv)
     if (WRITE_LATEX_TABLE_ROW)
     {
         instance->save_instance_info();
-        instance->save_literature_info(string(argv[2]));
+        if (CONVEX_RECOLORING_INSTANCE)
+            instance->save_literature_info(string(argv[2]));
     }
 
     // 1. BUILD AND SOLVE THE INTEGER PROGRAM

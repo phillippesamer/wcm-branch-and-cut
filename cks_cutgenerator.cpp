@@ -5,7 +5,6 @@
 bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
 bool SEPARATE_INDEGREE = true;
 
-bool CUTS_AT_ROOT_ONLY = false;
 bool MSI_ONLY_IF_NO_INDEGREE = false;   // only used with SEPARATE_MSI == true
 
 // strategy for running separation algorithms for colour-specific inequalities
@@ -69,9 +68,12 @@ CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
 
     this->num_vertices = instance->graph->num_vertices;
     this->num_subgraphs = instance->num_subgraphs;
+    this->at_root_relaxation = true;
 
     this->indegree_counter = 0;
     this->minimal_separators_counter = 0;
+
+    this->msi_current_colour = 0;
 }
 
 void CKSCutGenerator::callback()
@@ -92,9 +94,10 @@ void CKSCutGenerator::callback()
             if (this->getIntInfo(GRB_CB_MIPNODE_STATUS) != GRB_OPTIMAL)
                 return;
 
-            // generate cuts only at root node?
-            if (CUTS_AT_ROOT_ONLY && getDoubleInfo(GRB_CB_MIPNODE_NODCNT) > 0)
-                return;
+            // flag when done with the root node relaxation
+            if (this->at_root_relaxation)   // initially true
+                if (getDoubleInfo(GRB_CB_MIPNODE_NODCNT) > 0)
+                    this->at_root_relaxation = false;
 
             // retrieve relaxation solution
             x_val = new double*[num_vertices];
@@ -132,8 +135,8 @@ void CKSCutGenerator::callback()
 
             bool separated = false;
 
-            if (SEPARATE_INDEGREE)
-                separated = run_indegree_separation(ADD_LAZY_CNTRS);
+            //if (SEPARATE_INDEGREE)
+            //    separated = run_indegree_separation(ADD_LAZY_CNTRS);
 
             if (SEPARATE_MSI)
             {
@@ -355,10 +358,12 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
 {
     /// Solve the separation problem for minimal (a,b)-separator inequalities
 
-    long colour = 0;
+    long colours_tried = 0;
     bool done = false;
-    while (colour < num_subgraphs && !done)
+    while (colours_tried < num_subgraphs && !done)
     {
+        long colour = this->msi_current_colour;
+
         // 1. CONSTRUCT AUXILIARY NETWORK D, WITH REDUCTIONS FROM INTEGRAL VARS
 
         // LEMON digraph representing the current solution
@@ -715,7 +720,7 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
 
                         done_with_this_colour = true;
 
-                        if (!SEARCH_ALL_COLOURS_FOR_MSI)
+                        if (!SEARCH_ALL_COLOURS_FOR_MSI && !at_root_relaxation)
                             done = true;
                     }
                 }
@@ -726,7 +731,8 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             ++s;
         }
 
-        ++colour;
+        this->msi_current_colour = (this->msi_current_colour+1) % num_subgraphs;
+        ++colours_tried;
     }
 
     return (cuts_lhs.size() > 0);

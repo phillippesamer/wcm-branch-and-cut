@@ -51,6 +51,7 @@ protected:
     GRBModel *model;
     long num_vertices;
     long num_subgraphs;
+    bool at_root_relaxation;
 
     GRBVar **x_vars;
     double **x_val;
@@ -72,6 +73,9 @@ protected:
                                  long,
                                  vector<bool> &,
                                  long &);
+
+    // only used with SEARCH_ALL_COLOURS_FOR_MSI = false
+    long msi_current_colour;
 };
 
 #endif

@@ -13,12 +13,12 @@ n = 50
 percentual_rates = range(1, 26, 1)      # q \in 1, 2, ..., 25 => p \in 0.01, 0.02, ... , 0.25
 num_examples = 5
 make_figures = False
-destination_folder = "./new_g_np"
+destination_folder = "./alternate_g_np"
 
 if not os.path.exists(destination_folder):
     os.makedirs(destination_folder)
 
-seeds = [12182243, 45266141]
+seeds = [1092593, 1984337]
 random.seed(seeds[0])
 numpy.random.seed(seeds[1])
 
@@ -30,7 +30,8 @@ for q in percentual_rates:
         G = nx.erdos_renyi_graph(n, p)
         m = G.number_of_edges()
         
-        vertex_weights = random.sample(range(-50, 51), n)
+        #vertex_weights = random.sample(range(1, 101), n)        # all different
+        vertex_weights = [random.randint(1,100) for u in range(n)]
         
         filepath = f"{destination_folder}/{n}-{q}-{iteration}"
         
@@ -43,7 +44,7 @@ for q in percentual_rates:
         
         # create the .gcc file
         file = open(filepath + ".gcc", "w")
-        file.write(f"# G_{n,p} (Erdos-Renyi) graph, with n = {n} and p = {p}\n")
+        file.write(f"# G_{n,p} (Erdos-Renyi) graph, with n = {n} and p = {p}, and non-negative vertex weights\n")
         file.write(f"# Example {iteration} of {num_examples}\n")
         
         file.write(f"{filepath}\n")
@@ -58,12 +59,14 @@ for q in percentual_rates:
 
         file.close()
 
-"""
-# generate random number of colours as well?
-import random
-random.seed(621077887)
-num_components = [random.randint(3,14) for i in range(25)]
+# number of colours (constant for each combination of n,p)
+num_rates = len(percentual_rates)
+num_components = [random.randint(2,11) for i in range(num_rates)]
+
+file = open(destination_folder + "_colours.txt", "w")
+
 for x in num_components:
     for i in range(5):
-        print(x)
-"""
+        file.write(f"{x}\n")
+
+file.close()

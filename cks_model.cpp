@@ -142,11 +142,11 @@ int CKSModel::solve(bool logging)
 {
     try
     {
-        // turn off all built-in cut generators?
-        model->set(GRB_IntParam_Cuts, 0);
+        // turn off all built-in cut generators
+        // model->set(GRB_IntParam_Cuts, 0);
 
         /*
-        // turn off all preprocessing and heuristics?
+        // turn off all preprocessing and heuristics
         model->set(GRB_IntParam_Presolve, 0);
         model->set(GRB_IntParam_PrePasses, 0);
         model->set(GRB_DoubleParam_PreSOS1BigM, 0);
