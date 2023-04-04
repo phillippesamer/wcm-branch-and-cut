@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 import os
 
 # five G(n,p) random graphs, for p in {0.01, 0.02, ..., 0.25}
-n = 50
+n = 100
 percentual_rates = range(1, 26, 1)      # q \in 1, 2, ..., 25 => p \in 0.01, 0.02, ... , 0.25
 num_examples = 5
 make_figures = False
-destination_folder = "./alternate_g_np"
+destination_folder = "./alternate_g_np_100"
 
 if not os.path.exists(destination_folder):
     os.makedirs(destination_folder)
@@ -38,7 +38,7 @@ for q in percentual_rates:
         # save the graph to png file
         if make_figures:
             fig = plt.figure()
-            nx.draw(G, with_labels=True, node_color=[x+50 for x in vertex_weights], node_size=300, cmap=plt.cm.Blues)
+            nx.draw(G, with_labels=True, node_color=[x for x in vertex_weights], node_size=300, cmap=plt.cm.Blues)
             fig.savefig( filepath + ".png" )
             plt.close(fig)
         
