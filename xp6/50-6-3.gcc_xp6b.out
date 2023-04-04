@@ -1,0 +1,59 @@
+[ma. 03. april 18:07:56 +0200 2023]  ./input/alternate_g_np/50-6-3.gcc
+Set parameter Username
+Academic license - for non-commercial use only - expires 2024-03-28
+Set parameter TimeLimit to value 1800
+Set parameter PreCrush to value 1
+Set parameter LazyConstraints to value 1
+Gurobi Optimizer version 10.0.1 build v10.0.1rc0 (linux64)
+
+CPU model: AMD Ryzen 9 5950X 16-Core Processor, instruction set [SSE2|AVX|AVX2]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 54 rows, 250 columns and 650 nonzeros
+Model fingerprint: 0x8c4dc412
+Variable types: 0 continuous, 250 integer (250 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e+00, 1e+02]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve time: 0.00s
+Presolved: 54 rows, 250 columns, 650 nonzeros
+Variable types: 0 continuous, 250 integer (250 binary)
+
+Root relaxation: objective 2.421000e+03, 4 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 2421.00000    0    4          - 2421.00000      -     -    0s
+     0     0 2421.00000    0    4          - 2421.00000      -     -    0s
+     0     0 2421.00000    0    -          - 2421.00000      -     -    0s
+     0     0 2421.00000    0    7          - 2421.00000      -     -    0s
+     0     0 2421.00000    0    -          - 2421.00000      -     -    0s
+     0     0 2421.00000    0    9          - 2421.00000      -     -    0s
+     0     0 2421.00000    0    -          - 2421.00000      -     -    0s
+     0     0 2421.00000    0    2          - 2421.00000      -     -    0s
+     0     2 2421.00000    0    8          - 2421.00000      -     -    0s
+H 4112  2466                    2292.0000000 2421.00000  5.63%  13.7    0s
+H 4112  2342                    2357.0000000 2421.00000  2.72%  13.7    0s
+H 4112  2225                    2420.0000000 2421.00000  0.04%  13.7    0s
+H 4112  2114                    2421.0000000 2421.00000  0.00%  13.7    0s
+
+Cutting planes:
+  Lazy constraints: 27
+
+Explored 4112 nodes (56551 simplex iterations) in 0.65 seconds (0.23 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 4: 2421 2420 2357 2292 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.421000000000e+03, best bound 2.421000000000e+03, gap 0.0000%
+
+User-callback calls 8585, time in user-callback 0.26 sec
+Minimal separator inequalities added: 20030
+Indegree inequalities added: 0
+Passed solution check
+[ma. 03. april 18:07:57 +0200 2023]  done
+

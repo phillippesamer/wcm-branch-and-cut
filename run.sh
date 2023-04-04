@@ -520,20 +520,38 @@ bounds_075=(
 # done
 
 
-# new instances
+# new instances - full = msi+indegree
 
 idx=0
 for entry in "${instances_gnp_30[@]}";
 do
     timestamp=$(date)
-    $(echo "[$timestamp]  $entry" >> "$entry""_xp6.out")
+    $(echo "[$timestamp]  $entry" >> "$entry""_xp7a.out")
     echo "[$timestamp]  $entry"
 
-    output=$(./cks  $entry  ${instances_gnp_50_num_colours[$idx]} >> "$entry""_xp6.out" 2>&1)
+    output=$(./cks_full  $entry  ${instances_gnp_50_num_colours[$idx]} >> "$entry""_xp7a.out" 2>&1)
     echo "$output"
 
     timestamp=$(date)
-    $(echo -e "[$timestamp]  done\n" >> "$entry""_xp6.out")
+    $(echo -e "[$timestamp]  done\n" >> "$entry""_xp7a.out")
+
+    ((++idx))
+done
+
+# new instances msi only
+
+idx=0
+for entry in "${instances_gnp_30[@]}";
+do
+    timestamp=$(date)
+    $(echo "[$timestamp]  $entry" >> "$entry""_xp7b.out")
+    echo "[$timestamp]  $entry"
+
+    output=$(./cks_msi  $entry  ${instances_gnp_50_num_colours[$idx]} >> "$entry""_xp7b.out" 2>&1)
+    echo "$output"
+
+    timestamp=$(date)
+    $(echo -e "[$timestamp]  done\n" >> "$entry""_xp7b.out")
 
     ((++idx))
 done

@@ -3,13 +3,13 @@
 /// algorithm setup switches
 
 bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
-bool SEPARATE_INDEGREE = true;
+bool SEPARATE_INDEGREE = false;
 
 bool MSI_ONLY_IF_NO_INDEGREE = false;   // only used with SEPARATE_MSI == true
 
 // strategy for running separation algorithms for colour-specific inequalities
 bool SEARCH_ALL_COLOURS_FOR_INDEGREE = true;
-bool SEARCH_ALL_COLOURS_FOR_MSI = true;
+bool SEARCH_ALL_COLOURS_FOR_MSI = false;
 
 // at most 14 without changing everything to long double (which gurobi ignores)
 bool SET_MAX_PRECISION_IN_SEPARATION = true;

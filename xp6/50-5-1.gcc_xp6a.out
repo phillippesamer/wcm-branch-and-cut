@@ -1,0 +1,79 @@
+[ma. 03. april 15:06:23 +0200 2023]  ./input/alternate_g_np/50-5-1.gcc
+Set parameter Username
+Academic license - for non-commercial use only - expires 2024-03-28
+Set parameter TimeLimit to value 1800
+Set parameter PreCrush to value 1
+Set parameter LazyConstraints to value 1
+Gurobi Optimizer version 10.0.1 build v10.0.1rc0 (linux64)
+
+CPU model: AMD Ryzen 9 5950X 16-Core Processor, instruction set [SSE2|AVX|AVX2]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 56 rows, 350 columns and 950 nonzeros
+Model fingerprint: 0xfaae160b
+Variable types: 0 continuous, 350 integer (350 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e+00, 1e+02]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve time: 0.00s
+Presolved: 56 rows, 350 columns, 950 nonzeros
+Variable types: 0 continuous, 350 integer (350 binary)
+
+Root relaxation: objective 2.326000e+03, 6 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 2326.00000    0    6          - 2326.00000      -     -    0s
+     0     0 2326.00000    0    -          - 2326.00000      -     -    0s
+     0     0 2326.00000    0    6          - 2326.00000      -     -    0s
+     0     0 2326.00000    0    -          - 2326.00000      -     -    0s
+     0     0 2326.00000    0    6          - 2326.00000      -     -    0s
+     0     0 2326.00000    0    -          - 2326.00000      -     -    0s
+     0     0 2326.00000    0    5          - 2326.00000      -     -    0s
+     0     2 2326.00000    0    6          - 2326.00000      -     -    0s
+ 15168  8246 infeasible   87               - 2326.00000      -  21.4    5s
+ 29317 17299 2258.00000   56   12          - 2326.00000      -  27.3   10s
+ 43468 26222 infeasible   55               - 2326.00000      -  30.5   15s
+ 53201 33244 2326.00000   43   68          - 2326.00000      -  36.6   20s
+ 61402 40037 2248.20730   45   79          - 2326.00000      -  41.7   25s
+*66629 43179              31    1794.0000000 2326.00000  29.7%  44.4   28s
+*66630 43103              32    1849.0000000 2326.00000  25.8%  44.4   28s
+*66634 43077              33    1859.0000000 2326.00000  25.1%  44.4   28s
+H67177 44006                    1877.0000000 2326.00000  23.9%  44.7   29s
+ 68713 45142     cutoff   31      1877.00000 2326.00000  23.9%  45.6   30s
+H70139 18375                    2259.0000000 2326.00000  2.97%  46.4   30s
+*73321 14927              31    2281.0000000 2326.00000  1.97%  51.4   34s
+ 74197 15581     cutoff   33      2281.00000 2326.00000  1.97%  52.8   35s
+*77874 14621              66    2291.0000000 2326.00000  1.53%  54.9   37s
+ 80276 15403 2326.00000   23   91 2291.00000 2326.00000  1.53%  58.5   40s
+H81760  5715                    2313.0000000 2326.00000  0.56%  60.1   43s
+ 82913  5759 infeasible   34      2313.00000 2326.00000  0.56%  61.9   45s
+ 89526  5896 infeasible   43      2313.00000 2326.00000  0.56%  67.0   52s
+ 93476  5934 2326.00000   34   99 2313.00000 2326.00000  0.56%  71.1   56s
+ 97705  5935 2326.00000   46   70 2313.00000 2326.00000  0.56%  75.5   68s
+ 97807  4647 2326.00000   47   66 2313.00000 2326.00000  0.56%  75.7   83s
+ 112703  4450 infeasible   46      2313.00000 2326.00000  0.56%  85.8   87s
+ 114811  3735 2326.00000   44   28 2313.00000 2326.00000  0.56%  87.2   90s
+ 124929   274 infeasible   40      2313.00000 2326.00000  0.56%  88.6   96s
+
+Cutting planes:
+  User: 85
+  Lazy constraints: 4236
+
+Explored 128946 nodes (11288904 simplex iterations) in 96.43 seconds (136.49 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 8: 2313 2291 2281 ... 1794
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.313000000000e+03, best bound 2.313000000000e+03, gap 0.0000%
+
+User-callback calls 280643, time in user-callback 17.31 sec
+Minimal separator inequalities added: 484924
+Indegree inequalities added: 501469
+Passed solution check
+[ma. 03. april 15:07:59 +0200 2023]  done
+
