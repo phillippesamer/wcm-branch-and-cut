@@ -1,0 +1,54 @@
+[ti. 04. april 18:12:44 +0200 2023]  ./input/alternate_g_np/50-5-4.gcc
+Set parameter Username
+Academic license - for non-commercial use only - expires 2024-03-28
+Set parameter TimeLimit to value 1800
+Set parameter PreCrush to value 1
+Set parameter LazyConstraints to value 1
+Gurobi Optimizer version 10.0.1 build v10.0.1rc0 (linux64)
+
+CPU model: AMD Ryzen 9 5950X 16-Core Processor, instruction set [SSE2|AVX|AVX2]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 56 rows, 350 columns and 950 nonzeros
+Model fingerprint: 0x7726b9b4
+Variable types: 0 continuous, 350 integer (350 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [2e+00, 1e+02]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve time: 0.00s
+Presolved: 56 rows, 350 columns, 950 nonzeros
+Variable types: 0 continuous, 350 integer (350 binary)
+
+Root relaxation: objective 2.514000e+03, 6 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 2514.00000    0    6          - 2514.00000      -     -    0s
+     0     0 2514.00000    0    -          - 2514.00000      -     -    0s
+     0     0 2514.00000    0    -          - 2514.00000      -     -    0s
+     0     0 2514.00000    0    4          - 2514.00000      -     -    0s
+     0     0 2514.00000    0    -          - 2514.00000      -     -    0s
+     0     0 2514.00000    0    8          - 2514.00000      -     -    0s
+     0     0 2514.00000    0    8          - 2514.00000      -     -    0s
+     0     2 2514.00000    0    8          - 2514.00000      -     -    0s
+H    3     8                    2332.0000000 2514.00000  7.80%   5.0    0s
+H   66    50                    2437.0000000 2514.00000  3.16%   9.1    0s
+H 5360  2935                    2514.0000000 2514.00000  0.00%   8.9    0s
+
+Explored 5361 nodes (47523 simplex iterations) in 0.46 seconds (0.18 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 3: 2514 2437 2332 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.514000000000e+03, best bound 2.514000000000e+03, gap 0.0000%
+
+User-callback calls 11217, time in user-callback 0.12 sec
+Minimal separator inequalities added: 5584
+Indegree inequalities added: 0
+Passed solution check
+[ti. 04. april 18:12:45 +0200 2023]  done
+
