@@ -1,0 +1,79 @@
+[on. 05. april 15:31:55 +0200 2023]  ./input/alternate_g_np_100/100-2-3.gcc
+Set parameter Username
+Academic license - for non-commercial use only - expires 2024-03-28
+Set parameter TimeLimit to value 1800
+Set parameter PreCrush to value 1
+Set parameter LazyConstraints to value 1
+Gurobi Optimizer version 10.0.1 build v10.0.1rc0 (linux64)
+
+CPU model: AMD Ryzen 9 5950X 16-Core Processor, instruction set [SSE2|AVX|AVX2]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 101 rows, 200 columns and 400 nonzeros
+Model fingerprint: 0xc45046f7
+Variable types: 0 continuous, 200 integer (200 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e+00, 1e+02]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve time: 0.00s
+Presolved: 101 rows, 200 columns, 400 nonzeros
+Variable types: 0 continuous, 200 integer (200 binary)
+
+Root relaxation: objective 4.661000e+03, 1 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 4661.00000    0    -          - 4661.00000      -     -    0s
+     0     0 4661.00000    0    -          - 4661.00000      -     -    0s
+     0     0 4661.00000    0    -          - 4661.00000      -     -    0s
+     0     0 4661.00000    0   10          - 4661.00000      -     -    0s
+     0     0 4653.00000    0    8          - 4653.00000      -     -    0s
+     0     0 4653.00000    0    -          - 4653.00000      -     -    0s
+     0     0 4653.00000    0   12          - 4653.00000      -     -    0s
+     0     2 4653.00000    0   12          - 4653.00000      -     -    0s
+ 26886 14561 4316.00000   54    6          - 4316.00000      -  10.0    5s
+ 45967 26829 4316.00000   30    4          - 4316.00000      -  11.5   10s
+ 59343 35572 3770.00000   63    4          - 4316.00000      -  12.8   15s
+ 70568 43358 3731.00000   48   22          - 4316.00000      -  13.6   20s
+*71901 41412              52    3724.0000000 4316.00000  15.9%  13.7   20s
+H72413 41561                    3725.0000000 4316.00000  15.9%  13.8   20s
+*74709 41725              54    3759.0000000 4316.00000  14.8%  14.2   22s
+*74712 41451              55    3763.0000000 4316.00000  14.7%  14.2   22s
+H75572 41535                    3764.0000000 4316.00000  14.7%  14.3   22s
+ 79642 43174 3859.00000   33   14 3764.00000 4316.00000  14.7%  15.2   25s
+ 86960 44971     cutoff   50      3764.00000 4312.00000  14.6%  16.7   30s
+ 94183 47505 3780.00000   29   20 3764.00000 4295.00000  14.1%  17.4   35s
+H94284 29454                    3930.0000018 4279.00000  8.88%  17.5   35s
+ 99647 26202 4256.00000   24    - 3930.00000 4261.00000  8.42%  18.3   40s
+ 107978 20660 4248.00000   24    - 3930.00000 4248.00000  8.09%  19.4   45s
+ 118647 14515 4240.00000   24    - 3930.00000 4240.00000  7.89%  19.9   50s
+ 129641 13394     cutoff   47      3930.00000 4240.00000  7.89%  19.8   56s
+ 136733 12849 4240.00000   24    - 3930.00000 4240.00000  7.89%  19.6   60s
+ 145811 12405 4236.00000   24    - 3930.00000 4236.00000  7.79%  19.6   66s
+ 155227  8670 3931.50000   48   25 3930.00000 4229.00000  7.61%  19.4   71s
+ 163469  4655 4228.00000   24    - 3930.00000 4228.00000  7.58%  19.1   75s
+ 173408  2754 4157.00000   24    - 3930.00000 4157.00000  5.78%  18.6   80s
+ 184156   514 4136.00000   24    - 3930.00000 4136.00000  5.24%  17.8   85s
+*184685   613              24    3946.0000000 4136.00000  4.82%  17.7   85s
+
+Cutting planes:
+  User: 96
+  Lazy constraints: 6560
+
+Explored 198801 nodes (3324088 simplex iterations) in 89.22 seconds (67.59 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 7: 3946 3930 3764 ... 3724
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 3.946000000000e+03, best bound 3.946000000000e+03, gap 0.0000%
+
+User-callback calls 407833, time in user-callback 18.25 sec
+Minimal separator inequalities added: 143898
+Indegree inequalities added: 0
+Passed solution check
+[on. 05. april 15:33:24 +0200 2023]  done
+

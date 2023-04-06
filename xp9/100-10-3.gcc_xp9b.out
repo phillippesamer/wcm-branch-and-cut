@@ -1,0 +1,41 @@
+[on. 05. april 16:35:35 +0200 2023]  ./input/alternate_g_np_100/100-10-3.gcc
+Set parameter Username
+Academic license - for non-commercial use only - expires 2024-03-28
+Set parameter TimeLimit to value 1800
+Set parameter PreCrush to value 1
+Set parameter LazyConstraints to value 1
+Gurobi Optimizer version 10.0.1 build v10.0.1rc0 (linux64)
+
+CPU model: AMD Ryzen 9 5950X 16-Core Processor, instruction set [SSE2|AVX|AVX2]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 105 rows, 600 columns and 1600 nonzeros
+Model fingerprint: 0x8b83630d
+Variable types: 0 continuous, 600 integer (600 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [2e+00, 1e+02]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Found heuristic solution: objective 5142.0000000
+Presolve added 4 rows and 4 columns
+Presolve time: 0.00s
+Presolved: 109 rows, 604 columns, 1212 nonzeros
+Variable types: 0 continuous, 604 integer (600 binary)
+
+Root relaxation: cutoff, 0 iterations, 0.00 seconds (0.00 work units)
+
+Explored 1 nodes (0 simplex iterations) in 0.00 seconds (0.00 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 1: 5142 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 5.142000000000e+03, best bound 5.142000000000e+03, gap 0.0000%
+
+User-callback calls 97, time in user-callback 0.00 sec
+Minimal separator inequalities added: 0
+Indegree inequalities added: 0
+Passed solution check
+[on. 05. april 16:35:35 +0200 2023]  done
+

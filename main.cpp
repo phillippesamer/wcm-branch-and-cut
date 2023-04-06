@@ -22,7 +22,7 @@ bool CONVEX_RECOLORING_INSTANCE = false;   // e.g. as of ITOR'2022
 double RUN_CKS_WITH_TIME_LIMIT = 1800;
 
 bool WRITE_LATEX_TABLE_ROW = true;
-string LATEX_TABLE_FILE_PATH = string("xp7msi.dat");
+string LATEX_TABLE_FILE_PATH = string("xp9msi.dat");
 
 int main(int argc, char **argv)
 {

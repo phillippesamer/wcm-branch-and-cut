@@ -1,0 +1,92 @@
+[on. 05. april 09:00:40 +0200 2023]  ./input/alternate_g_np_100/100-1-0.gcc
+Set parameter Username
+Academic license - for non-commercial use only - expires 2024-03-28
+Set parameter TimeLimit to value 1800
+Set parameter PreCrush to value 1
+Set parameter LazyConstraints to value 1
+Gurobi Optimizer version 10.0.1 build v10.0.1rc0 (linux64)
+
+CPU model: AMD Ryzen 9 5950X 16-Core Processor, instruction set [SSE2|AVX|AVX2]
+Thread count: 16 physical cores, 32 logical processors, using up to 32 threads
+
+Optimize a model with 106 rows, 700 columns and 1900 nonzeros
+Model fingerprint: 0x91d83b6f
+Variable types: 0 continuous, 700 integer (700 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [3e+00, 1e+02]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve added 5 rows and 5 columns
+Presolve time: 0.00s
+Presolved: 111 rows, 705 columns, 1415 nonzeros
+Variable types: 0 continuous, 705 integer (700 binary)
+
+Root relaxation: objective 5.046000e+03, 1 iterations, 0.00 seconds (0.00 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 5046.00000    0    -          - 5046.00000      -     -    0s
+     0     0 5046.00000    0    -          - 5046.00000      -     -    0s
+     0     0 5046.00000    0    -          - 5046.00000      -     -    0s
+     0     0 5046.00000    0    -          - 5046.00000      -     -    0s
+     0     0 5046.00000    0    -          - 5046.00000      -     -    0s
+     0     0 5046.00000    0    -          - 5046.00000      -     -    0s
+     0     0 5046.00000    0   11          - 5046.00000      -     -    0s
+     0     0 5046.00000    0   27          - 5046.00000      -     -    0s
+     0     0 3963.00000    0    7          - 3963.00000      -     -    0s
+     0     0 3945.50000    0   21          - 3945.50000      -     -    0s
+     0     0 3815.16667    0   50          - 3815.16667      -     -    0s
+     0     0 3787.54545    0   46          - 3787.54545      -     -    0s
+     0     0 3756.58333    0   59          - 3756.58333      -     -    0s
+     0     0 3745.47390    0   83          - 3745.47390      -     -    0s
+     0     0 3707.02931    0   89          - 3707.02931      -     -    0s
+     0     0 3638.95120    0   92          - 3638.95120      -     -    0s
+     0     0 3545.08420    0  111          - 3545.08420      -     -    0s
+     0     0 3468.14718    0  122          - 3468.14718      -     -    0s
+     0     0 3384.08995    0  128          - 3384.08995      -     -    0s
+     0     0 3323.40463    0  129          - 3323.40463      -     -    0s
+     0     0 3276.36284    0  145          - 3276.36284      -     -    0s
+     0     0 3238.63745    0  146          - 3238.63745      -     -    0s
+     0     0 3202.18593    0  153          - 3202.18593      -     -    0s
+     0     0 3160.98500    0  162          - 3160.98500      -     -    0s
+     0     0 3121.60928    0  167          - 3121.60928      -     -    0s
+     0     0 3079.74766    0  165          - 3079.74766      -     -    0s
+     0     0 3039.61644    0  170          - 3039.61644      -     -    0s
+     0     0 3006.85747    0  173          - 3006.85747      -     -    0s
+     0     0 2982.84345    0  170          - 2982.84345      -     -    0s
+     0     0 2967.87672    0  182          - 2967.87672      -     -    0s
+     0     0 2952.28572    0  183          - 2952.28572      -     -    0s
+     0     0 2937.71675    0  183          - 2937.71675      -     -    0s
+     0     0 2936.59752    0  192          - 2936.59752      -     -    0s
+     0     0 2927.75333    0  188          - 2927.75333      -     -    0s
+     0     0 2923.06271    0  189          - 2923.06271      -     -    0s
+     0     0 2915.41017    0  193          - 2915.41017      -     -    0s
+     0     2 2915.41017    0  193          - 2915.41017      -     -    0s
+H 3735  3147                    2461.0000000 2579.00000  4.79%  63.1    4s
+H 3735  2989                    2519.0000000 2579.00000  2.38%  63.1    4s
+H 3749  2849                    2540.0000000 2579.00000  1.54%  63.9    4s
+H 3749  2707                    2562.0000000 2579.00000  0.66%  63.9    4s
+  3750  2707 2579.00000    7   34 2562.00000 2579.00000  0.66%  63.9    5s
+
+Cutting planes:
+  User: 412
+  Gomory: 4
+  Zero half: 21
+  Lazy constraints: 34
+
+Explored 3789 nodes (256861 simplex iterations) in 5.95 seconds (11.05 work units)
+Thread count was 32 (of 32 available processors)
+
+Solution count 4: 2562 2540 2519 2461 
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.562000000000e+03, best bound 2.562000000000e+03, gap 0.0000%
+
+User-callback calls 8961, time in user-callback 0.87 sec
+Minimal separator inequalities added: 23591
+Indegree inequalities added: 24695
+Passed solution check
+[on. 05. april 09:00:46 +0200 2023]  done
+
