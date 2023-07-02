@@ -1,5 +1,5 @@
-#ifndef _CKS_MODEL_H_
-#define _CKS_MODEL_H_
+#ifndef _WCM_MODEL_H_
+#define _WCM_MODEL_H_
 
 #include <iostream>
 #include <sstream>
@@ -11,29 +11,29 @@
 #include "gurobi_c++.h"
 
 #include "io.h"
-#include "cks_cutgenerator.h"
+#include "wcm_cutgenerator.h"
 
 #define EPSILON_TOL 0.00000001
 
 enum ModelStatus {AT_OPTIMUM, STATUS_UNKNOWN};
 
 /***
- * \file cks_model.h
+ * \file wcm_model.h
  * 
- * Module for the integer programming model to find connected k subpartitions
- * of minimum weight, using the Gurobi solver API.
+ * Module for the integer programming model to find connected matchings of
+ * maximum weight using the Gurobi solver API.
  * 
  * \author Phillippe Samer <samer@uib.no>
- * \date 22.12.2022
+ * \date 02.07.2023
  */
 
-class CKSCutGenerator;
+class WCMCutGenerator;
 
-class CKSModel
+class WCMModel
 {
 public:
-    CKSModel(IO*);
-    virtual ~CKSModel();
+    WCMModel(IO*);
+    virtual ~WCMModel();
 
     int solve(bool);
     double solution_weight;
@@ -67,7 +67,7 @@ protected:
     void create_constraints();
     void create_objective();
 
-    CKSCutGenerator *cutgen;
+    WCMCutGenerator *cutgen;
 
     bool check_solution();
     void dfs_to_tag_component(long, long, vector<long>&, vector<bool>&);

@@ -1,4 +1,4 @@
-#include "cks_cutgenerator.h"
+#include "wcm_cutgenerator.h"
 
 /// algorithm setup switches
 
@@ -60,7 +60,7 @@ long inline check_components(vector< vector<long> > &adj_list,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
+WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
 {
     this->model = model;
     this->x_vars = x_vars;
@@ -76,7 +76,7 @@ CKSCutGenerator::CKSCutGenerator(GRBModel *model, GRBVar **x_vars, IO *instance)
     this->msi_current_colour = 0;
 }
 
-void CKSCutGenerator::callback()
+void WCMCutGenerator::callback()
 {
     /***
      * The actual callback method within the solver. Currently, only used for 
@@ -157,16 +157,16 @@ void CKSCutGenerator::callback()
     catch (GRBException e)
     {
         cout << "Error " << e.getErrorCode()
-             << " during CKSCutGenerator::callback(): ";
+             << " during WCMCutGenerator::callback(): ";
         cout << e.getMessage() << endl;
     }
     catch (...)
     {
-        cout << "Unexpected error during CKSCutGenerator::callback()" << endl;
+        cout << "Unexpected error during WCMCutGenerator::callback()" << endl;
     }
 }
 
-bool CKSCutGenerator::separate_lpr()
+bool WCMCutGenerator::separate_lpr()
 {
     /// Interface to be used when solving the LP relaxation only.
 
@@ -217,7 +217,7 @@ bool CKSCutGenerator::separate_lpr()
     }
 }
 
-void CKSCutGenerator::clean_x_val_beyond_precision(int precision)
+void WCMCutGenerator::clean_x_val_beyond_precision(int precision)
 {
     /// prevent floating point errors by ignoring digits beyond given precision
     for (long u = 0; u < num_vertices; ++u)
@@ -229,7 +229,7 @@ void CKSCutGenerator::clean_x_val_beyond_precision(int precision)
         }
 }
 
-bool CKSCutGenerator::run_indegree_separation(int kind_of_cut)
+bool WCMCutGenerator::run_indegree_separation(int kind_of_cut)
 {
     /// wrapper for the separation procedure to suit different execution contexts
 
@@ -265,7 +265,7 @@ bool CKSCutGenerator::run_indegree_separation(int kind_of_cut)
     return model_updated;
 }
 
-bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
+bool WCMCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
                                         vector<long> &cuts_rhs)
 {
     /// Solve the separation problem for indegree inequalities, for each colour
@@ -316,7 +316,7 @@ bool CKSCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
     return (cuts_lhs.size() > 0);
 }
 
-bool CKSCutGenerator::run_minimal_separators_separation(int kind_of_cut)
+bool WCMCutGenerator::run_minimal_separators_separation(int kind_of_cut)
 {
     /// wrapper for the separation procedure to suit different execution contexts
 
@@ -353,7 +353,7 @@ bool CKSCutGenerator::run_minimal_separators_separation(int kind_of_cut)
     return model_updated;
 }
 
-bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
+bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                                                   vector<long> &cuts_rhs)
 {
     /// Solve the separation problem for minimal (a,b)-separator inequalities
@@ -738,7 +738,7 @@ bool CKSCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
     return (cuts_lhs.size() > 0);
 }
 
-void inline CKSCutGenerator::lift_to_minimal_separator(vector<long> &S,
+void inline WCMCutGenerator::lift_to_minimal_separator(vector<long> &S,
                                                        vector<bool> &S_mask,
                                                        long s,
                                                        long t)
@@ -791,7 +791,7 @@ void inline CKSCutGenerator::lift_to_minimal_separator(vector<long> &S,
     }  // repeat search if S was updated 
 }
 
-void inline CKSCutGenerator::dfs_avoiding_set(vector<long> &S,
+void inline WCMCutGenerator::dfs_avoiding_set(vector<long> &S,
                                               vector<bool> &S_mask,
                                               long source,
                                               vector<bool> &seen,

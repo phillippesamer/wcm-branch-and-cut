@@ -1,11 +1,11 @@
-#include "cks_model.h"
+#include "wcm_model.h"
 
 /// algorithm setup switches
 
 bool CHECK_SOLUTION = true;            // check if the k subgraphs are connected
 bool ORDER_COLOURS_CONSTRAINTS = true; // reduces solution symmetry
 
-CKSModel::CKSModel(IO *instance)
+WCMModel::WCMModel(IO *instance)
 {
     this->instance = instance;
 
@@ -26,7 +26,7 @@ CKSModel::CKSModel(IO *instance)
         create_constraints();
         create_objective();
 
-        this->cutgen = new CKSCutGenerator(model, x, instance);
+        this->cutgen = new WCMCutGenerator(model, x, instance);
 
         //model->write("cks.lp");
     }
@@ -37,7 +37,7 @@ CKSModel::CKSModel(IO *instance)
     }
 }
 
-CKSModel::~CKSModel()
+WCMModel::~WCMModel()
 {
     delete cutgen;
 
@@ -49,7 +49,7 @@ CKSModel::~CKSModel()
     delete env;
 }
 
-void CKSModel::create_variables()
+void WCMModel::create_variables()
 {
     char buffer[50];
 
@@ -68,7 +68,7 @@ void CKSModel::create_variables()
     model->update();
 }
 
-void CKSModel::create_constraints()
+void WCMModel::create_constraints()
 {
     ostringstream cname;
 
@@ -111,7 +111,7 @@ void CKSModel::create_constraints()
     model->update();
 }
 
-void CKSModel::create_objective()
+void WCMModel::create_objective()
 {
     GRBLinExpr objective_expression = 0;
 
@@ -138,7 +138,7 @@ void CKSModel::create_objective()
     model->update();
 }
 
-int CKSModel::solve(bool logging)
+int WCMModel::solve(bool logging)
 {
     try
     {
@@ -193,7 +193,7 @@ int CKSModel::solve(bool logging)
     }
     catch(...)
     {
-        cout << "Unexpected error during optimization inside CKSModel::solve()"
+        cout << "Unexpected error during optimization inside WCMModel::solve()"
              << endl;
         return 0;
     }
@@ -201,7 +201,7 @@ int CKSModel::solve(bool logging)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-bool CKSModel::check_solution()
+bool WCMModel::check_solution()
 {
     /***
      * Depth-first search checking each colour induces a connected subgraph.
@@ -249,7 +249,7 @@ bool CKSModel::check_solution()
     return true;
 }
 
-void CKSModel::dfs_to_tag_component(long u,
+void WCMModel::dfs_to_tag_component(long u,
                                     long u_colour,
                                     vector<long> &colour_map,
                                     vector<bool> &vertex_done)
@@ -271,7 +271,7 @@ void CKSModel::dfs_to_tag_component(long u,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int CKSModel::save_optimization_status()
+int WCMModel::save_optimization_status()
 {
     /// Set class fields accordingly after call to optmize()
 
@@ -371,7 +371,7 @@ int CKSModel::save_optimization_status()
     }
 }
 
-bool CKSModel::solve_lp_relax(bool logging)
+bool WCMModel::solve_lp_relax(bool logging)
 {
     /***
      * Solves the LP relaxation of the full IP formulation for connected
@@ -505,43 +505,43 @@ bool CKSModel::solve_lp_relax(bool logging)
     catch(GRBException e)
     {
         cout << "Error " << e.getErrorCode()
-             << " during CKSModel::solve_lp_relax(): ";
+             << " during WCMModel::solve_lp_relax(): ";
         cout << e.getMessage() << endl;
         return false;
     }
     catch (...)
     {
-        cout << "Unexpected error during CKSModel::solve_lp_relax()" << endl;
+        cout << "Unexpected error during WCMModel::solve_lp_relax()" << endl;
         return false;
     }
 }
 
-void CKSModel::set_time_limit(double tl)
+void WCMModel::set_time_limit(double tl)
 {
     model->set(GRB_DoubleParam_TimeLimit, tl);
 }
 
-double CKSModel::get_mip_runtime()
+double WCMModel::get_mip_runtime()
 {
     return model->get(GRB_DoubleAttr_Runtime);
 }
 
-double CKSModel::get_mip_gap()
+double WCMModel::get_mip_gap()
 {
     return model->get(GRB_DoubleAttr_MIPGap);
 }
 
-long CKSModel::get_mip_num_nodes()
+long WCMModel::get_mip_num_nodes()
 {
     return model->get(GRB_DoubleAttr_NodeCount);
 }
 
-long CKSModel::get_mip_msi_counter()
+long WCMModel::get_mip_msi_counter()
 {
     return cutgen->minimal_separators_counter;
 }
 
-long CKSModel::get_mip_indegree_counter()
+long WCMModel::get_mip_indegree_counter()
 {
     return cutgen->indegree_counter;
 }

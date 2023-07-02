@@ -25,7 +25,7 @@ using namespace lemon;
  * Some classes are declared friends to avoid cumbersome get/set calls.
  * 
  * \author Phillippe Samer <samer@uib.no>
- * \date 22.12.2022
+ * \date 02.07.2023
  */
 class Graph
 {
@@ -41,8 +41,8 @@ public:
 
 private:
     friend class IO;
-    friend class CKSModel;
-    friend class CKSCutGenerator;
+    friend class WCMModel;
+    friend class WCMCutGenerator;
 
     long num_vertices;
     long num_edges;

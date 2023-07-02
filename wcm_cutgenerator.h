@@ -1,5 +1,5 @@
-#ifndef _CKS_CUT_GEN_H_
-#define _CKS_CUT_GEN_H_
+#ifndef _WCM_CUT_GEN_H_
+#define _WCM_CUT_GEN_H_
 
 #include <iostream>
 #include <sstream>
@@ -15,7 +15,7 @@
 using namespace lemon;
 
 #include "io.h"
-#include "cks_model.h"
+#include "wcm_model.h"
 
 // kinds of cuts
 #define ADD_USER_CUTS 1
@@ -23,25 +23,25 @@ using namespace lemon;
 #define ADD_STD_CNTRS 3
 
 /***
- * \file cks_cutgenerator.h
+ * \file wcm_cutgenerator.h
  * 
  * Module for the Gurobi callback class, implementing the separation procedure
- * for minimal separators and indegree inequalities
+ * for blossom, minimal separators and indegree inequalities
  * 
  * Extends (and implements) the abstract base class in Gurobi.
  * 
  * \author Phillippe Samer <samer@uib.no>
- * \date 22.12.2022
+ * \date 02.07.2023
  */
 
-class CKSCutGenerator: public GRBCallback
+class WCMCutGenerator: public GRBCallback
 {
 public:
-    CKSCutGenerator(GRBModel *, GRBVar**, IO*);
-    virtual ~CKSCutGenerator() { }
+    WCMCutGenerator(GRBModel *, GRBVar**, IO*);
+    virtual ~WCMCutGenerator() { }
 
 protected:
-    friend class CKSModel;
+    friend class WCMModel;
 
     void callback();
     bool separate_lpr();

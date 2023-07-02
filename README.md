@@ -1,5 +1,5 @@
-# Connected subpartition branch-and-cut
-Branch-and-cut algorithm for finding an optimal connected k subpartition of a graph (disjoint vertex subsets inducing k connected subgraphs)
+# Weighted connected matchings branch-and-cut 
+Branch-and-cut algorithm for finding an optimal weighted connected matching: a subset M of edges in a graph inducing a matching, such that the vertices covered by M induce a connected subgraph.
 
 
 ### Dependencies
@@ -42,13 +42,13 @@ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib"
 ### To compile and run our software:
 
 ```
-git clone https://github.com/phillippesamer/connected-subpartition-branch-and-cut.git
-cd connected-subpartition-branch-and-cut
+git clone https://github.com/phillippesamer/wcm-branch-and-cut.git
+cd wcm-branch-and-cut
 ```
 
 Edit the Makefile initial definition of variable `GRB_PATH` to reflect the root folder where Gurobi is installed. Finally, compile and run the solver:
 
 ```
 make
-./cks [input file path] [number of subgraphs]
+./wcm [input file path]
 ```
