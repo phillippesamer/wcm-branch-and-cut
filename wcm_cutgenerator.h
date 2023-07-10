@@ -37,7 +37,7 @@ using namespace lemon;
 class WCMCutGenerator: public GRBCallback
 {
 public:
-    WCMCutGenerator(GRBModel *, GRBVar**, IO*);
+    WCMCutGenerator(GRBModel*, GRBVar*, IO*);
     virtual ~WCMCutGenerator() { }
 
 protected:
@@ -50,12 +50,11 @@ protected:
     IO *instance;
     GRBModel *model;
     long num_vertices;
-    long num_subgraphs;
     bool at_root_relaxation;
 
-    GRBVar **x_vars;
-    double **x_val;
-    void inline clean_x_val_beyond_precision(int);
+    GRBVar *y_vars;
+    double *y_val;
+    void inline clean_vars_beyond_precision(int);
 
     long indegree_counter;
     bool run_indegree_separation(int);
@@ -73,9 +72,6 @@ protected:
                                  long,
                                  vector<bool> &,
                                  long &);
-
-    // only used with SEARCH_ALL_COLOURS_FOR_MSI = false
-    long msi_current_colour;
 };
 
 #endif

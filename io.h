@@ -37,11 +37,6 @@ public:
     void write_summary_info(string);
 
     // instance data
-    long num_subgraphs;
-
-    bool recoloring_instance;
-    vector<long> original_colouring;
-
     string instance_id;
     string instance_id_trimmed;
 

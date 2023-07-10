@@ -18,7 +18,7 @@
 using namespace std;
 
 // execution switches
-double RUN_CKS_WITH_TIME_LIMIT = 1800;
+double RUN_WCM_WITH_TIME_LIMIT = 1800;
 
 bool WRITE_LATEX_TABLE_ROW = true;
 string LATEX_TABLE_FILE_PATH = string("xp1.dat");
@@ -54,13 +54,11 @@ int main(int argc, char **argv)
 
     WCMModel *model = new WCMModel(instance);
 
-    /*
     model->solve_lp_relax(false);
     if (WRITE_LATEX_TABLE_ROW)
         instance->save_lpr_info(model->lp_bound, model->lp_runtime);
-    */
     
-    model->set_time_limit(RUN_CKS_WITH_TIME_LIMIT);
+    model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT);
     model->solve(true);
 
     if (WRITE_LATEX_TABLE_ROW)

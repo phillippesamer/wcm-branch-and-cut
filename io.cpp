@@ -6,9 +6,6 @@ IO::IO()
 
     // only for consistency (while an input parsing method is not called)
     this->graph = new Graph();
-    this->num_subgraphs = 1;
-    this->recoloring_instance = false;
-    this->original_colouring = vector<long>();
 }
 
 IO::~IO()
@@ -80,6 +77,7 @@ bool IO::parse_input_file(string filename)
             graph->index_matrix[j][i] = line_idx;
         }
 
+        // TO DO: edge weights instead
         // n lines for vertex weights
         for (long line_idx = 0; line_idx < num_vertices; ++line_idx)
         {
@@ -111,8 +109,6 @@ void IO::save_instance_info()
     summary_info << setw(8) << graph->num_vertices;
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << graph->num_edges;
-    summary_info << setw(8) << "  &  ";
-    summary_info << setw(8) << num_subgraphs;
     summary_info << setw(8) << "  &&  ";
 
     #ifdef DEBUG

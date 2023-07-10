@@ -21,6 +21,7 @@ Graph::Graph(long n, long m)
     s.reserve(m);
     t.reserve(m);
 
+    // TO DO: edge weights instead
     w.reserve(n);
 }
 
@@ -92,6 +93,7 @@ void Graph::init_lemon()
         (*lemon_edges_inverted_index)[e] = idx;
     }
 
+    // TO DO: edge weights instead
     // vertex to weight map
     lemon_weight = new ListGraph::NodeMap<double>(*lemon_graph);
     for (long idx=0; idx<num_vertices; ++idx)

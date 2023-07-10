@@ -2,8 +2,10 @@
 
 /// algorithm setup switches
 
-bool CHECK_SOLUTION = true;            // check if the k subgraphs are connected
-bool ORDER_COLOURS_CONSTRAINTS = true; // reduces solution symmetry
+bool CHECK_SOLUTION = true;      // check if the subgraph is connected
+bool GRB_CUTS = true;            // gurobi (automatic) cuts on/off
+bool GRB_HEURISTICS = true;      // gurobi (automatic) heuristics on/off
+bool GRB_PREPROCESSING = true;   // gurobi (automatic) preprocessing on/off
 
 WCMModel::WCMModel(IO *instance)
 {
@@ -11,7 +13,7 @@ WCMModel::WCMModel(IO *instance)
 
     this->solution_weight = numeric_limits<double>::max();
     this->solution_dualbound = numeric_limits<double>::max();
-    this->solution_vector = vector<long>(instance->graph->num_vertices, -1);
+    this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
     this->solution_status = STATUS_UNKNOWN;
     this->solution_runtime = -1;
 
@@ -26,9 +28,9 @@ WCMModel::WCMModel(IO *instance)
         create_constraints();
         create_objective();
 
-        this->cutgen = new WCMCutGenerator(model, x, instance);
+        this->cutgen = new WCMCutGenerator(model, y, instance);
 
-        //model->write("cks.lp");
+        //model->write("wcm.lp");
     }
     catch(GRBException e)
     {
@@ -41,10 +43,7 @@ WCMModel::~WCMModel()
 {
     delete cutgen;
 
-    for (long u=0; u < instance->graph->num_vertices; u++)
-        delete[] x[u];
-    delete[] x;
-
+    delete[] y;
     delete model;
     delete env;
 }
@@ -53,16 +52,12 @@ void WCMModel::create_variables()
 {
     char buffer[50];
 
-    // binary vars x[u][c] = 1 iff vertex u is assigned to subgraph c
-    x = new GRBVar*[instance->graph->num_vertices];
+    // binary vars y[u] = 1 iff vertex u is covered by the matching
+    y = new GRBVar[instance->graph->num_vertices];
     for (long u = 0; u < instance->graph->num_vertices; ++u)
     {
-        x[u] = new GRBVar[instance->num_subgraphs];
-        for (long c = 0; c < instance->num_subgraphs; ++c)
-        {
-            sprintf(buffer, "x_%ld_%ld", u, c);
-            x[u][c] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, buffer);
-        }
+        sprintf(buffer, "y_%ld", u);
+        y[u] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, buffer);
     }
 
     model->update();
@@ -70,70 +65,17 @@ void WCMModel::create_variables()
 
 void WCMModel::create_constraints()
 {
-    ostringstream cname;
-
-    // 1. GUB constraint: each vertex assigned to at most one subgraph
-    for (long u = 0; u < instance->graph->num_vertices; ++u)
-    {
-        GRBLinExpr gub_ineq = 0;
-        for (long c = 0; c < instance->num_subgraphs; ++c)
-            gub_ineq += x[u][c];
-
-        cname.str("");
-        cname << "C1_GUB_" << u;
-        model->addConstr(gub_ineq <= 1, cname.str());
-    }
-
-    if (ORDER_COLOURS_CONSTRAINTS)
-    {
-        /***
-         * Reduces symmetry by imposing that the component induced by colour c
-         * is larger than that induced by colour c+1. Also avoids solutions with
-         * "empty components" between non-empty ones.
-         */
-        for (long c = 0; c < instance->num_subgraphs - 1; ++c)
-        {
-            GRBLinExpr order_ineq = 0;
-
-            // vertices in c - vertices in c+1
-            for (long u = 0; u < instance->graph->num_vertices; ++u)
-            {
-                order_ineq += x[u][c];
-                order_ineq += (-1)*x[u][c+1];
-            }
-
-            cname.str("");
-            cname << "C2_ORDER_" << c;
-            model->addConstr(order_ineq >= 0, cname.str());
-        }
-    }
-
-    model->update();
+    // TO DO: all
 }
 
 void WCMModel::create_objective()
 {
     GRBLinExpr objective_expression = 0;
 
-    if (instance->recoloring_instance == true)
-    {
-        for (long u = 0; u < instance->graph->num_vertices; ++u)
-        {
-            long c = instance->original_colouring.at(u);
-            double w = instance->graph->w.at(u);
-            objective_expression += (w * x[u][c]);
-        }
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+        objective_expression += (instance->graph->w[u]) * y[u];
 
-        model->setObjective(objective_expression, GRB_MAXIMIZE);
-    }
-    else
-    {
-        for (long u = 0; u < instance->graph->num_vertices; ++u)
-            for (long c = 0; c < instance->num_subgraphs; ++c)
-                objective_expression += (instance->graph->w[u]) * x[u][c];
-
-        model->setObjective(objective_expression, GRB_MAXIMIZE);
-    }
+    model->setObjective(objective_expression, GRB_MAXIMIZE);
 
     model->update();
 }
@@ -142,22 +84,24 @@ int WCMModel::solve(bool logging)
 {
     try
     {
-        // turn off all built-in cut generators
-        // model->set(GRB_IntParam_Cuts, 0);
+        // solver features
+        if (!GRB_CUTS)
+            model->set(GRB_IntParam_Cuts, 0);
 
-        /*
-        // turn off all preprocessing and heuristics
-        model->set(GRB_IntParam_Presolve, 0);
-        model->set(GRB_IntParam_PrePasses, 0);
-        model->set(GRB_DoubleParam_PreSOS1BigM, 0);
-        model->set(GRB_DoubleParam_PreSOS2BigM, 0);
-        model->set(GRB_IntParam_PreSparsify, 0);
-        model->set(GRB_IntParam_PreCrush, 1);
-        model->set(GRB_IntParam_DualReductions, 0);
-        model->set(GRB_IntParam_Aggregate, 0);
+        if (!GRB_HEURISTICS)
+            model->set(GRB_DoubleParam_Heuristics, 0);
 
-        model->set(GRB_DoubleParam_Heuristics, 0);
-        */
+        if (!GRB_PREPROCESSING)
+        {
+            model->set(GRB_IntParam_Presolve, 0);
+            model->set(GRB_IntParam_PrePasses, 0);
+            model->set(GRB_DoubleParam_PreSOS1BigM, 0);
+            model->set(GRB_DoubleParam_PreSOS2BigM, 0);
+            model->set(GRB_IntParam_PreSparsify, 0);
+            model->set(GRB_IntParam_PreCrush, 1);
+            model->set(GRB_IntParam_DualReductions, 0);
+            model->set(GRB_IntParam_Aggregate, 0);
+        }
 
         if (logging == true)
             model->set(GRB_IntParam_OutputFlag, 1);
@@ -205,43 +149,30 @@ bool WCMModel::check_solution()
 {
     /***
      * Depth-first search checking each colour induces a connected subgraph.
-     * NB! Assumes an integer feasible solution is available in vars x
+     * NB! Assumes an integer feasible solution is available in vars y
      */
 
-    vector<bool> colour_done = vector<bool>(instance->num_subgraphs, false);
-    vector<bool> vertex_done
+    // retrieve vertices covered in the solution
+    vector<bool> covered = vector<bool>(instance->graph->num_vertices, false);
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+        if (this->y[u].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
+            covered.at(u) = true;
+
+    // trigger dfs
+    bool done = false;
+    vector<bool> seen
         = vector<bool>(instance->graph->num_vertices, false);
 
-    // retrieve assignment of each vertex in the solution; -1 means uncoloured
-    vector<long> colour_map = vector<long>(instance->graph->num_vertices, -1);
     for (long u = 0; u < instance->graph->num_vertices; ++u)
     {
-        long c = 0;
-        while (c < instance->num_subgraphs && colour_map.at(u) < 0)
+        if (covered.at(u) && !seen.at(u))
         {
-            if (this->x[u][c].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
-                colour_map.at(u) = c;
-            else
-                ++c;
-        }
-    }
-
-    // dfs from each colour
-    for (long u = 0; u < instance->graph->num_vertices; ++u)
-    {
-        long u_colour = colour_map.at(u);   // -1 if uncoloured
-
-        if (vertex_done.at(u) == false && u_colour > 0)
-        {
-            if (colour_done.at(u_colour))
-            {
-                // had already processed that colour without finding u
-                return false;
-            }
+            if (done)
+                return false;   // u not found earlier
             else
             {
-                dfs_to_tag_component(u, u_colour, colour_map, vertex_done);
-                colour_done.at(u_colour) = true;
+                dfs_to_tag_component(u, covered, seen);
+                done = true;
             }
         }
     }
@@ -250,22 +181,20 @@ bool WCMModel::check_solution()
 }
 
 void WCMModel::dfs_to_tag_component(long u,
-                                    long u_colour,
-                                    vector<long> &colour_map,
-                                    vector<bool> &vertex_done)
+                                    vector<bool> &covered,
+                                    vector<bool> &seen)
 {
     // auxiliary dfs to check the connected component from vertex u
 
-    vertex_done.at(u) = true;
+    seen.at(u) = true;
 
     for (list<long>::iterator it = instance->graph->adj_list.at(u).begin();
          it != instance->graph->adj_list.at(u).end(); ++it)
     {
         long v = *it;
-        long v_colour = colour_map.at(v);
 
-        if (v_colour == u_colour && vertex_done.at(v) == false)
-            dfs_to_tag_component(v, u_colour, colour_map, vertex_done);
+        if (covered.at(v) && !seen.at(v))
+            dfs_to_tag_component(v, covered, seen);
     }
 }
 
@@ -275,7 +204,7 @@ int WCMModel::save_optimization_status()
 {
     /// Set class fields accordingly after call to optmize()
 
-    //this->model->write("cks_full_model.lp");
+    //this->model->write("wcm_full_model.lp");
 
     this->solution_runtime = model->get(GRB_DoubleAttr_Runtime);
 
@@ -286,43 +215,38 @@ int WCMModel::save_optimization_status()
         this->solution_weight = this->solution_dualbound 
                               = model->get(GRB_DoubleAttr_ObjVal);
 
-        this->solution_vector = vector<long>(instance->graph->num_vertices, -1);
+        this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
 
         #ifdef DEBUG
             cout << "Optimal solution: " << endl;
         #endif
 
-        ostringstream *solution_output 
-            = new ostringstream[instance->num_subgraphs];
-
-        for (long c = 0; c < instance->num_subgraphs; ++c)
-        {
-            solution_output[c].str("");
-            solution_output[c] << "#" << c << ": ";
-        }
+        ostringstream solution_output;
+        solution_output.str("");
+        solution_output << "covered vertices: " ;
 
         for (long u = 0; u < instance->graph->num_vertices; ++u)
-            for (long c = 0; c < instance->num_subgraphs; ++c)
-                if (this->x[u][c].get(GRB_DoubleAttr_X) > EPSILON_TOL)
-                {
-                    // NB: gurobi vars are floating point, allowing +0 and -0
-                    this->solution_vector.at(u) = c;
-                    solution_output[c] << u << " ";
-                }
+            if (this->y[u].get(GRB_DoubleAttr_X) > EPSILON_TOL)
+            {
+                // NB: gurobi vars are floating point, allowing +0 and -0
+                this->solution_vector.at(u) = true;
+                solution_output << u << " ";
+            }
 
         #ifdef DEBUG
-            for (long c = 0; c < instance->num_subgraphs; ++c)
-                cout << solution_output[c].str() << endl;
+            cout << solution_output.str() << endl;
         #endif
-
-        delete[] solution_output;
 
        if (CHECK_SOLUTION)
         {
             if (this->check_solution())
                 cout << "Passed solution check" << endl;
             else
-                cout << "WRONG SOLUTION" << endl;
+            {
+                cout << endl << "######################" << endl;
+                cout << "### WRONG SOLUTION ###" << endl;
+                cout << "######################" << endl << endl;
+            }
         }
 
         // returning number of feasible solutions found (including sub-optimal)
@@ -334,7 +258,7 @@ int WCMModel::save_optimization_status()
 
         this->solution_weight = numeric_limits<double>::max();
         this->solution_dualbound = numeric_limits<double>::max();
-        this->solution_vector = vector<long>(instance->graph->num_vertices, -1);
+        this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
 
         cout << "UNEXPECTED ERROR: model infeasible! (runtime "
              << solution_runtime << ")" << endl;
@@ -363,7 +287,7 @@ int WCMModel::save_optimization_status()
         this->solution_status = STATUS_UNKNOWN;
         this->solution_weight = numeric_limits<double>::max();
         this->solution_dualbound = numeric_limits<double>::max();
-        this->solution_vector = vector<long>(instance->graph->num_vertices, -1);
+        this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
 
         cout << "UNEXPECTED ERROR: unknown status after solve()" << endl;
 
@@ -374,9 +298,9 @@ int WCMModel::save_optimization_status()
 bool WCMModel::solve_lp_relax(bool logging)
 {
     /***
-     * Solves the LP relaxation of the full IP formulation for connected
-     * k-subpartitions, including indegree and minimal separator inequalities.
-     * Returns true iff the bound was computed successfully.
+     * Determine the LP relaxation bound of the full IP formulation, including
+     * indegree and minimal separator inequalities. Returns true iff the bound 
+     * was computed successfully.
      */
 
     try
@@ -391,8 +315,7 @@ bool WCMModel::solve_lp_relax(bool logging)
 
         // make vars continuous
         for (long u = 0; u < instance->graph->num_vertices; ++u)
-            for (long c = 0; c < instance->num_subgraphs; ++c)
-                x[u][c].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
+            y[u].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
 
         // calculating wall clock time to solve LP relaxation
         struct timeval *clock_start
@@ -444,29 +367,18 @@ bool WCMModel::solve_lp_relax(bool logging)
             #ifdef DEBUG_LPR
                 cout << "LPR solution: " << endl;
 
-                ostringstream *solution_output 
-                    = new ostringstream[instance->num_subgraphs];
-
-                for (long c = 0; c < instance->num_subgraphs; ++c)
-                {
-                    solution_output[c].str("");
-                    solution_output[c] << "#" << c << ": " << endl;
-                }
+                ostringstream solution_output;
+                solution_output.str("");
+                solution_output << "(fractionally) covered vertices: " << endl;
 
                 for (long u = 0; u < instance->graph->num_vertices; ++u)
-                    for (long c = 0; c < instance->num_subgraphs; ++c)
-                        if (this->x[u][c].get(GRB_DoubleAttr_X) > EPSILON_TOL)
-                        {
-                            solution_output[c] << "    x[" << u
-                                               << "][" << c << "] = "
-                                               << x[u][c].get(GRB_DoubleAttr_X)
-                                               << endl;
-                        }
+                    if (this->y[u].get(GRB_DoubleAttr_X) > EPSILON_TOL)
+                    {
+                        solution_output << "    y[" << u << "] = "
+                                        << y[u].get(GRB_DoubleAttr_X) << endl;
+                    }
 
-                for (long c = 0; c < instance->num_subgraphs; ++c)
-                    cout << solution_output[c].str() << endl;
-
-                delete[] solution_output;
+                cout << solution_output.str() << endl;
             #endif
 
             if (logging)
@@ -481,8 +393,7 @@ bool WCMModel::solve_lp_relax(bool logging)
             // restore IP model
             model->set(GRB_IntParam_Cuts, -1);
             for (long u = 0; u < instance->graph->num_vertices; ++u)
-                for (long c = 0; c < instance->num_subgraphs; ++c)
-                    x[u][c].set(GRB_CharAttr_VType, GRB_BINARY);
+                y[u].set(GRB_CharAttr_VType, GRB_BINARY);
 
             model->update();
 

@@ -1,18 +1,19 @@
 .RECIPEPREFIX = >
 
 UNAME_S := $(shell uname -n)
-ifeq ($(UNAME_S),ii3102747)
-    GRB_PATH    = /scratch/gurobi1000/linux64
+ifeq ($(UNAME_S),djervheta)
+    GRB_PATH    = /opt/gurobi1002/linux64
     GRB_INCLUDE = -I$(GRB_PATH)/include/
     GRB_LINK    = -L$(GRB_PATH)/lib/ -lgurobi_g++5.2 -lgurobi100
 else
-    ifeq ($(UNAME_S),optimization-PC)
-        GRB_PATH    = /opt/gurobi1001/linux64
-        GRB_INCLUDE = -I$(GRB_PATH)/include/ 
+    ifeq ($(UNAME_S),ii3102747.dyn.uib.no)
+        GRB_PATH    = /scratch/gurobi1002/linux64
+        LEMON_PATH  = /scratch/lemon-1.3.1/lemon
+        GRB_INCLUDE = -I$(GRB_PATH)/include/ -I$(LEMON_PATH)
         GRB_LINK    = -L$(GRB_PATH)/lib/ -lgurobi_g++5.2 -lgurobi100
     else
         GRB_PATH    = /opt/gurobi1002/linux64
-        GRB_INCLUDE = -I$(GRB_PATH)/include/
+        GRB_INCLUDE = -I$(GRB_PATH)/include/ 
         GRB_LINK    = -L$(GRB_PATH)/lib/ -lgurobi_g++5.2 -lgurobi100
     endif
 endif
