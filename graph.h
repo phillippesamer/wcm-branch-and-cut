@@ -47,8 +47,7 @@ private:
     long num_vertices;
     long num_edges;
 
-    // TO DO: edge weights instead
-    vector<double> w;    // vertex weights
+    vector<double> w;    // edge weights
 
     // adjacency list
     vector< list<long> > adj_list;
@@ -67,7 +66,7 @@ private:
     vector<ListGraph::Node> lemon_vertices;
     vector<ListGraph::Edge> lemon_edges;
     ListGraph::EdgeMap<long> *lemon_edges_inverted_index;
-    ListGraph::NodeMap<double> *lemon_weight;   // TO DO: edge weights instead
+    ListGraph::EdgeMap<double> *lemon_weight;
 
     bool lemon_test_adj(ListGraph &, ListGraph::Node &, ListGraph::Node &);
     ListGraph::Edge lemon_test_adj_getting_edge(ListGraph &,

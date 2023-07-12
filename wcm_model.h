@@ -38,7 +38,8 @@ public:
     int solve(bool);
     double solution_weight;
     double solution_dualbound;
-    vector<bool> solution_vector;   // vertex covered by the matching or not
+    vector<bool> solution_vector_x;   // edge in matching or not
+    vector<bool> solution_vector_y;   // vertex covered by the matching or not
     ModelStatus solution_status;
     double solution_runtime;
 
@@ -61,6 +62,7 @@ protected:
 
     GRBEnv *env;
     GRBModel *model;
+    GRBVar *x;
     GRBVar *y;
 
     void create_variables();
@@ -70,7 +72,7 @@ protected:
     WCMCutGenerator *cutgen;
 
     bool check_solution();
-    void dfs_to_tag_component(long, vector<bool>&, vector<bool>&);
+    void dfs_to_tag_component(long, vector<bool>&);
 
     int save_optimization_status();
 };

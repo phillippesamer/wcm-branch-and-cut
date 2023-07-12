@@ -53,12 +53,16 @@ bool IO::parse_input_file(string filename)
         for (long line_idx = 0; line_idx < num_edges; ++line_idx)
         {
             long i, j;
+            double w;
             
             input_fh >> i;
             graph->s.push_back(i);
 
             input_fh >> j;
             graph->t.push_back(j);
+
+            input_fh >> w;
+            graph->w.push_back(w);
             
             graph->adj_list[i].push_back(j);
             graph->adj_list[j].push_back(i);
@@ -75,15 +79,6 @@ bool IO::parse_input_file(string filename)
             // store index of current edge
             graph->index_matrix[i][j] = line_idx;
             graph->index_matrix[j][i] = line_idx;
-        }
-
-        // TO DO: edge weights instead
-        // n lines for vertex weights
-        for (long line_idx = 0; line_idx < num_vertices; ++line_idx)
-        {
-            double w;
-            input_fh >> w;
-            graph->w.push_back(w);
         }
 
         input_fh.close();

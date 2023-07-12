@@ -13,7 +13,8 @@ WCMModel::WCMModel(IO *instance)
 
     this->solution_weight = numeric_limits<double>::max();
     this->solution_dualbound = numeric_limits<double>::max();
-    this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
+    this->solution_vector_x = vector<bool>(instance->graph->num_edges, false);
+    this->solution_vector_y = vector<bool>(instance->graph->num_vertices, false);
     this->solution_status = STATUS_UNKNOWN;
     this->solution_runtime = -1;
 
@@ -43,6 +44,7 @@ WCMModel::~WCMModel()
 {
     delete cutgen;
 
+    delete[] x;
     delete[] y;
     delete model;
     delete env;
@@ -51,6 +53,14 @@ WCMModel::~WCMModel()
 void WCMModel::create_variables()
 {
     char buffer[50];
+
+    // binary vars x[e] = 1 iff edge e is in the matching
+    x = new GRBVar[instance->graph->num_edges];
+    for (long e = 0; e < instance->graph->num_edges; ++e)
+    {
+        sprintf(buffer, "x_%ld", e);
+        x[e] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, buffer);
+    }
 
     // binary vars y[u] = 1 iff vertex u is covered by the matching
     y = new GRBVar[instance->graph->num_vertices];
@@ -65,15 +75,55 @@ void WCMModel::create_variables()
 
 void WCMModel::create_constraints()
 {
-    // TO DO: all
+    ostringstream cname;
+
+    // 1. DEGREE INEQUALITIES: x vars induce a matching
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+    {
+        GRBLinExpr deg_ineq = 0;
+
+        for (list<long>::iterator it = instance->graph->adj_list.at(u).begin();
+             it != instance->graph->adj_list.at(u).end(); ++it)
+        {
+            long v = *it;
+            long e = instance->graph->index_matrix[u][v];
+            deg_ineq += x[e];
+        }
+
+        cname.str("");
+        cname << "C1_DEGREE_" << u;
+        model->addConstr(deg_ineq <= 1, cname.str());
+    }
+
+    // 2. LINKING CONSTRAINTS: y_u is the sum of x_uv for v neighbours of u
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+    {
+        GRBLinExpr link_xy = 0;
+
+        for (list<long>::iterator it = instance->graph->adj_list.at(u).begin();
+             it != instance->graph->adj_list.at(u).end(); ++it)
+        {
+            long v = *it;
+            long e = instance->graph->index_matrix[u][v];
+            link_xy += x[e];
+        }
+
+        link_xy -= y[u];
+
+        cname.str("");
+        cname << "C2_LINKING_y" << u;
+        model->addConstr(link_xy == 0, cname.str());
+    }
+
+    model->update();
 }
 
 void WCMModel::create_objective()
 {
     GRBLinExpr objective_expression = 0;
 
-    for (long u = 0; u < instance->graph->num_vertices; ++u)
-        objective_expression += (instance->graph->w[u]) * y[u];
+    for (long e = 0; e < instance->graph->num_edges; ++e)
+        objective_expression += (instance->graph->w[e]) * x[e];
 
     model->setObjective(objective_expression, GRB_MAXIMIZE);
 
@@ -148,30 +198,24 @@ int WCMModel::solve(bool logging)
 bool WCMModel::check_solution()
 {
     /***
-     * Depth-first search checking each colour induces a connected subgraph.
-     * NB! Assumes an integer feasible solution is available in vars y
+     * Depth-first search checking that vertices covered by the matching induce
+     * a connected subgraph. NB! Assuming solution_vector_y and 
+     * solution_vector_x are set.
      */
 
-    // retrieve vertices covered in the solution
-    vector<bool> covered = vector<bool>(instance->graph->num_vertices, false);
-    for (long u = 0; u < instance->graph->num_vertices; ++u)
-        if (this->y[u].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
-            covered.at(u) = true;
-
-    // trigger dfs
     bool done = false;
-    vector<bool> seen
-        = vector<bool>(instance->graph->num_vertices, false);
+    vector<bool> seen = vector<bool>(instance->graph->num_vertices, false);
 
     for (long u = 0; u < instance->graph->num_vertices; ++u)
     {
-        if (covered.at(u) && !seen.at(u))
+        // should trigger enter only once, from the first covered vertex 
+        if (solution_vector_y.at(u) && !seen.at(u))
         {
             if (done)
-                return false;   // u not found earlier
+                return false;   // u not found earlier!
             else
             {
-                dfs_to_tag_component(u, covered, seen);
+                dfs_to_tag_component(u, seen);
                 done = true;
             }
         }
@@ -181,7 +225,6 @@ bool WCMModel::check_solution()
 }
 
 void WCMModel::dfs_to_tag_component(long u,
-                                    vector<bool> &covered,
                                     vector<bool> &seen)
 {
     // auxiliary dfs to check the connected component from vertex u
@@ -193,8 +236,8 @@ void WCMModel::dfs_to_tag_component(long u,
     {
         long v = *it;
 
-        if (covered.at(v) && !seen.at(v))
-            dfs_to_tag_component(v, covered, seen);
+        if (solution_vector_y.at(v) && !seen.at(v))
+            dfs_to_tag_component(v, seen);
     }
 }
 
@@ -215,7 +258,8 @@ int WCMModel::save_optimization_status()
         this->solution_weight = this->solution_dualbound 
                               = model->get(GRB_DoubleAttr_ObjVal);
 
-        this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
+        this->solution_vector_x = vector<bool>(instance->graph->num_edges, false);
+        this->solution_vector_y = vector<bool>(instance->graph->num_vertices, false);
 
         #ifdef DEBUG
             cout << "Optimal solution: " << endl;
@@ -223,15 +267,31 @@ int WCMModel::save_optimization_status()
 
         ostringstream solution_output;
         solution_output.str("");
+        solution_output << "matching edges:   " ;
+        for (long e = 0; e < instance->graph->num_edges; ++e)
+        {
+            if (this->x[e].get(GRB_DoubleAttr_X) > EPSILON_TOL)
+            {
+                // NB: gurobi vars are floating point, allowing +0 and -0
+                this->solution_vector_x.at(e) = true;
+
+                solution_output << e << "={";
+                solution_output << instance->graph->s[e] << ",";
+                solution_output << instance->graph->t[e] << "}  ";
+            }
+        }
+
         solution_output << "covered vertices: " ;
 
         for (long u = 0; u < instance->graph->num_vertices; ++u)
+        {
             if (this->y[u].get(GRB_DoubleAttr_X) > EPSILON_TOL)
             {
                 // NB: gurobi vars are floating point, allowing +0 and -0
-                this->solution_vector.at(u) = true;
+                this->solution_vector_y.at(u) = true;
                 solution_output << u << " ";
             }
+        }
 
         #ifdef DEBUG
             cout << solution_output.str() << endl;
@@ -258,7 +318,8 @@ int WCMModel::save_optimization_status()
 
         this->solution_weight = numeric_limits<double>::max();
         this->solution_dualbound = numeric_limits<double>::max();
-        this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
+        this->solution_vector_x = vector<bool>(instance->graph->num_edges, false);
+        this->solution_vector_y = vector<bool>(instance->graph->num_vertices, false);
 
         cout << "UNEXPECTED ERROR: model infeasible! (runtime "
              << solution_runtime << ")" << endl;
@@ -287,7 +348,8 @@ int WCMModel::save_optimization_status()
         this->solution_status = STATUS_UNKNOWN;
         this->solution_weight = numeric_limits<double>::max();
         this->solution_dualbound = numeric_limits<double>::max();
-        this->solution_vector = vector<bool>(instance->graph->num_vertices, false);
+        this->solution_vector_x = vector<bool>(instance->graph->num_edges, false);
+        this->solution_vector_y = vector<bool>(instance->graph->num_vertices, false);
 
         cout << "UNEXPECTED ERROR: unknown status after solve()" << endl;
 
@@ -299,8 +361,8 @@ bool WCMModel::solve_lp_relax(bool logging)
 {
     /***
      * Determine the LP relaxation bound of the full IP formulation, including
-     * indegree and minimal separator inequalities. Returns true iff the bound 
-     * was computed successfully.
+     * blossom, indegree and minimal separator inequalities. Returns true iff 
+     * the bound was computed successfully.
      */
 
     try
@@ -314,6 +376,8 @@ bool WCMModel::solve_lp_relax(bool logging)
             model->set(GRB_IntParam_OutputFlag, 0);
 
         // make vars continuous
+        for (long e = 0; e < instance->graph->num_edges; ++e)
+            x[e].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
         for (long u = 0; u < instance->graph->num_vertices; ++u)
             y[u].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
 
@@ -369,14 +433,27 @@ bool WCMModel::solve_lp_relax(bool logging)
 
                 ostringstream solution_output;
                 solution_output.str("");
+                solution_output << "(fractional) matching edges: " << endl;
+
+                for (long e = 0; e < instance->graph->num_edges; ++e)
+                {
+                    if (this->x[e].get(GRB_DoubleAttr_X) > EPSILON_TOL)
+                    {
+                        solution_output << "    x[" << e << "] = "
+                                        << x[e].get(GRB_DoubleAttr_X) << endl;
+                    }
+                }
+
                 solution_output << "(fractionally) covered vertices: " << endl;
 
                 for (long u = 0; u < instance->graph->num_vertices; ++u)
+                {
                     if (this->y[u].get(GRB_DoubleAttr_X) > EPSILON_TOL)
                     {
                         solution_output << "    y[" << u << "] = "
                                         << y[u].get(GRB_DoubleAttr_X) << endl;
                     }
+                }
 
                 cout << solution_output.str() << endl;
             #endif
@@ -392,6 +469,8 @@ bool WCMModel::solve_lp_relax(bool logging)
 
             // restore IP model
             model->set(GRB_IntParam_Cuts, -1);
+            for (long e = 0; e < instance->graph->num_edges; ++e)
+                x[e].set(GRB_CharAttr_VType, GRB_BINARY);
             for (long u = 0; u < instance->graph->num_vertices; ++u)
                 y[u].set(GRB_CharAttr_VType, GRB_BINARY);
 
