@@ -105,11 +105,6 @@ void IO::save_instance_info()
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << graph->num_edges;
     summary_info << setw(8) << "  &&  ";
-
-    #ifdef DEBUG
-        cout << "save_instance_info got: " << endl;
-        cout << summary_info.str() << endl;
-    #endif
 }
 
 void IO::save_lpr_info(double lp_bound, double lp_time)
@@ -119,11 +114,6 @@ void IO::save_lpr_info(double lp_bound, double lp_time)
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << fixed << setprecision(2) << lp_time;
     summary_info << setw(8) << "  &&  ";
-
-    #ifdef DEBUG
-        cout << "save_lpr_info got: " << endl;
-        cout << summary_info.str() << endl;
-    #endif
 }
 
 void IO::save_ip_info(long lb,
@@ -153,11 +143,6 @@ void IO::save_ip_info(long lb,
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << indegree_count;
     summary_info << setw(8) << "  \\\\  ";
-
-    #ifdef DEBUG
-        cout << "save_ip_info got: " << endl;
-        cout << summary_info.str() << endl;
-    #endif
 }
 
 void IO::write_summary_info(string output_file_path)

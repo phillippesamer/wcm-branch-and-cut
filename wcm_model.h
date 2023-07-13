@@ -71,10 +71,11 @@ protected:
 
     WCMCutGenerator *cutgen;
 
+    int save_optimization_status();
+    void fill_solution_vectors();
+
     bool check_solution();
     void dfs_to_tag_component(long, vector<bool>&);
-
-    int save_optimization_status();
 };
 
 #endif

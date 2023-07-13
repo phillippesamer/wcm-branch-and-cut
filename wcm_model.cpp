@@ -2,7 +2,6 @@
 
 /// algorithm setup switches
 
-bool CHECK_SOLUTION = true;      // check if the subgraph is connected
 bool GRB_CUTS = true;            // gurobi (automatic) cuts on/off
 bool GRB_HEURISTICS = true;      // gurobi (automatic) heuristics on/off
 bool GRB_PREPROCESSING = true;   // gurobi (automatic) preprocessing on/off
@@ -203,12 +202,75 @@ bool WCMModel::check_solution()
      * solution_vector_x are set.
      */
 
+    // I. X AND Y VARS CORRECTLY LINKED
+
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+    {
+        if (solution_vector_y.at(u))
+        {
+            bool chosen_vertex_indeed_covered = false;
+
+            for (list<long>::iterator it = instance->graph->adj_list.at(u).begin();
+                 it != instance->graph->adj_list.at(u).end(); ++it)
+            {
+                long v = *it;
+                long edge_idx = instance->graph->index_matrix[u][v];
+                if (solution_vector_x.at(edge_idx))
+                    chosen_vertex_indeed_covered = true;
+            }
+
+            if (!chosen_vertex_indeed_covered)
+                return false;
+        }
+        else
+        {
+            bool missing_vertex_indeed_not_covered = true;
+
+            for (list<long>::iterator it = instance->graph->adj_list.at(u).begin();
+                 it != instance->graph->adj_list.at(u).end(); ++it)
+            {
+                long v = *it;
+                long edge_idx = instance->graph->index_matrix[u][v];
+                if (solution_vector_x.at(edge_idx))
+                    missing_vertex_indeed_not_covered = false;
+            }
+
+            if (!missing_vertex_indeed_not_covered)
+                return false;
+        }
+    }
+
+    // II. X VARS INDUCE A MATCHING
+
+    vector<long> degree_in_solution = vector<long>(instance->graph->num_vertices, 0);
+    bool still_a_matching = true;
+
+    for (long e = 0; e < instance->graph->num_edges; ++e)
+    {
+        if (solution_vector_x.at(e))
+        {
+            long v1 = instance->graph->s.at(e);
+            long v2 = instance->graph->t.at(e);
+            degree_in_solution.at(v1)++;
+            degree_in_solution.at(v2)++;
+
+            if (degree_in_solution.at(v1) > 1 || degree_in_solution.at(v2) > 1)
+                still_a_matching = false;
+        }
+    }
+
+    if (!still_a_matching)
+        return false;
+
+
+    // III. Y VARS INDUCE A CONNECTED SUBGRAPH
+
     bool done = false;
     vector<bool> seen = vector<bool>(instance->graph->num_vertices, false);
 
     for (long u = 0; u < instance->graph->num_vertices; ++u)
     {
-        // should trigger enter only once, from the first covered vertex 
+        // should enter only once, from the first covered vertex 
         if (solution_vector_y.at(u) && !seen.at(u))
         {
             if (done)
@@ -245,9 +307,7 @@ void WCMModel::dfs_to_tag_component(long u,
 
 int WCMModel::save_optimization_status()
 {
-    /// Set class fields accordingly after call to optmize()
-
-    //this->model->write("wcm_full_model.lp");
+    /// Set class fields accordingly after call to optimize()
 
     this->solution_runtime = model->get(GRB_DoubleAttr_Runtime);
 
@@ -258,56 +318,15 @@ int WCMModel::save_optimization_status()
         this->solution_weight = this->solution_dualbound 
                               = model->get(GRB_DoubleAttr_ObjVal);
 
-        this->solution_vector_x = vector<bool>(instance->graph->num_edges, false);
-        this->solution_vector_y = vector<bool>(instance->graph->num_vertices, false);
+        this->fill_solution_vectors();
 
-        #ifdef DEBUG
-            cout << "Optimal solution: " << endl;
-        #endif
-
-        ostringstream solution_output;
-        solution_output.str("");
-        solution_output << "matching edges:   " ;
-        for (long e = 0; e < instance->graph->num_edges; ++e)
-        {
-            if (this->x[e].get(GRB_DoubleAttr_X) > EPSILON_TOL)
-            {
-                // NB: gurobi vars are floating point, allowing +0 and -0
-                this->solution_vector_x.at(e) = true;
-
-                solution_output << e << "={";
-                solution_output << instance->graph->s[e] << ",";
-                solution_output << instance->graph->t[e] << "}  ";
-            }
-        }
-
-        solution_output << "covered vertices: " ;
-
-        for (long u = 0; u < instance->graph->num_vertices; ++u)
-        {
-            if (this->y[u].get(GRB_DoubleAttr_X) > EPSILON_TOL)
-            {
-                // NB: gurobi vars are floating point, allowing +0 and -0
-                this->solution_vector_y.at(u) = true;
-                solution_output << u << " ";
-            }
-        }
-
-        #ifdef DEBUG
-            cout << solution_output.str() << endl;
-        #endif
-
-       if (CHECK_SOLUTION)
-        {
-            if (this->check_solution())
-                cout << "Passed solution check" << endl;
-            else
-            {
-                cout << endl << "######################" << endl;
-                cout << "### WRONG SOLUTION ###" << endl;
-                cout << "######################" << endl << endl;
-            }
-        }
+        if (this->check_solution())
+            cout << "PASSED SOLUTION CHECK" << endl << endl;
+        else
+            cout << endl
+                 << "######################" << endl
+                 << "### WRONG SOLUTION ###" << endl
+                 << "######################" << endl << endl;
 
         // returning number of feasible solutions found (including sub-optimal)
         return model->get(GRB_IntAttr_SolCount);
@@ -330,10 +349,24 @@ int WCMModel::save_optimization_status()
     {
         this->solution_status = STATUS_UNKNOWN;
 
-        this->solution_weight = (model->get(GRB_IntAttr_SolCount) > 0) ?
-                                model->get(GRB_DoubleAttr_ObjVal) :
-                                numeric_limits<double>::max();
         this->solution_dualbound = model->get(GRB_DoubleAttr_ObjBound);
+
+        if (model->get(GRB_IntAttr_SolCount) > 0)
+        {
+            this->solution_weight = model->get(GRB_DoubleAttr_ObjVal);
+
+            this->fill_solution_vectors();
+
+            if (this->check_solution())
+                cout << "PASSED SOLUTION CHECK" << endl << endl;
+            else
+                cout << endl
+                     << "######################" << endl
+                     << "### WRONG SOLUTION ###" << endl
+                     << "######################" << endl << endl;
+        }
+        else
+            this->solution_weight = numeric_limits<double>::max();
 
         cout << "Time limit exceeded (" << solution_runtime << ")" << endl;
         cout << "Dual bound " << this->solution_dualbound 
@@ -355,6 +388,45 @@ int WCMModel::save_optimization_status()
 
         return 0;
     }
+}
+
+void WCMModel::fill_solution_vectors()
+{
+    // NB: gurobi vars are floating point, allowing +0 and -0
+    this->solution_vector_x = vector<bool>(instance->graph->num_edges, false);
+    this->solution_vector_y = vector<bool>(instance->graph->num_vertices, false);
+
+    ostringstream solution_output;
+    solution_output.str("");
+
+    solution_output << "### Solution matching:" << endl;
+    for (long e = 0; e < instance->graph->num_edges; ++e)
+    {
+        if (this->x[e].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
+        {
+            this->solution_vector_x.at(e) = true;
+
+            solution_output << "  x_" << e << " = {";
+            solution_output << instance->graph->s[e] << ", ";
+            solution_output << instance->graph->t[e] << "}" << endl;
+        }
+    }
+
+    solution_output << endl << "### Covered vertices: " ;
+
+    for (long u = 0; u < instance->graph->num_vertices; ++u)
+    {
+        if (this->y[u].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
+        {
+            this->solution_vector_y.at(u) = true;
+
+            solution_output << u << " ";
+        }
+    }
+
+    #ifdef DEBUG
+        cout << endl << solution_output.str() << endl << endl;
+    #endif
 }
 
 bool WCMModel::solve_lp_relax(bool logging)
