@@ -29,7 +29,8 @@ public:
     IO();
     virtual ~IO();
 
-    bool parse_input_file(string);
+    bool parse_gcc_file(string);
+    bool parse_stp_file(string);
 
     void save_instance_info();
     void save_lpr_info(double, double);
