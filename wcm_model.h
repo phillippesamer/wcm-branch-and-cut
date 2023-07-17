@@ -13,8 +13,6 @@
 #include "io.h"
 #include "wcm_cutgenerator.h"
 
-#define EPSILON_TOL 0.00000001
-
 enum ModelStatus {AT_OPTIMUM, STATUS_UNKNOWN};
 
 /***

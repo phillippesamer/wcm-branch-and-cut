@@ -238,7 +238,7 @@ void IO::save_instance_info()
 {
     /// save instance info: id  n  m  k
     summary_info << left;
-    summary_info << setw(15) << instance_id_trimmed;
+    summary_info << setw(50) << instance_id_trimmed;
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << graph->num_vertices;
     summary_info << setw(8) << "  &  ";

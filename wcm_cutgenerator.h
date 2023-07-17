@@ -54,6 +54,7 @@ protected:
 
     GRBVar *y_vars;
     double *y_val;
+    bool y_integral;
     void inline clean_vars_beyond_precision(int);
 
     long indegree_counter;
@@ -62,7 +63,9 @@ protected:
 
     long minimal_separators_counter;
     bool run_minimal_separators_separation(int);
-    bool separate_minimal_separators(vector<GRBLinExpr> &, vector<long> &);
+    bool separate_minimal_separators_std(vector<GRBLinExpr> &, vector<long> &);
+    bool separate_minimal_separators_integral(vector<GRBLinExpr> &, vector<long> &);
+    long msi_next_source;
     void inline lift_to_minimal_separator(vector<long> &,
                                           vector<bool> &,
                                           long,

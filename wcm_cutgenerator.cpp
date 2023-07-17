@@ -2,15 +2,26 @@
 
 /// algorithm setup switches
 
-bool SEPARATE_MSI = true;               // MSI = minimal separator inequalities
+bool SEPARATE_MSI = true;              // MSI = minimal separator inequalities
 bool SEPARATE_INDEGREE = true;
 
-bool MSI_ONLY_IF_NO_INDEGREE = false;   // only used with SEPARATE_MSI == true
+bool MSI_FROM_INTEGER_POINTS_ONLY = false; // weaker but faster node relaxation
+bool MSI_STRATEGY_FIRST_CUT = true;    // only used when separating fract.points
+bool MSI_ONLY_IF_NO_INDEGREE = false;  // only used when separating fract.points
 
-// at most 14 without changing everything to long double (which gurobi ignores)
-bool SET_MAX_PRECISION_IN_SEPARATION = true;
-int  SEPARATION_PRECISION = 14;
-double MSI_VIOLATION_TOL = 1e-10;
+// clean any bits beyond the corresponding precision to avoid numerical errors?
+// (at most 14, since gurobi does not support long double yet...)
+// NB! THIS OPTION MIGHT RISK MISSING A VIOLATED INEQUALITY DUE
+const bool CLEAN_VARS_BEYOND_PRECISION = false;
+const int SEPARATION_PRECISION = 14;
+
+// use a tolerance in dealing with relaxation values?
+// e.g. y_u < epsilon instead of y_u == 0
+// set to 0 to stick to exact values and operators
+const double MSI_EPSILON = 1e-5;
+const double MSI_ZERO = MSI_EPSILON;
+const double MSI_ONE = 1.0 - MSI_EPSILON;
+const double INDEGREE_EPSILON = 1e-5;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -46,12 +57,28 @@ long inline check_components(vector< vector<long> > &adj_list,
     for (long u=0; u < n; ++u)
     {
         if (components[u] < 0)
+        {
             dfs_to_tag_components(u, count, components, adj_list);
-
-        ++count;
+            ++count;
+        }
     }
 
     return count;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool inline check_integrality(double *point, long dim)
+{
+    /// check if all coordinates of a point are zero/one-valued
+
+    for (long i=0; i < dim; ++i)
+    {
+        if (point[i] > MSI_ZERO && point[i] < MSI_ONE)
+            return false;
+    }
+
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -60,6 +87,7 @@ WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar *y_vars, IO *instance)
 {
     this->model = model;
     this->y_vars = y_vars;
+    this->y_integral = false;
     this->instance = instance;
     this->num_vertices = instance->graph->num_vertices;
 
@@ -67,6 +95,7 @@ WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar *y_vars, IO *instance)
 
     this->indegree_counter = 0;
     this->minimal_separators_counter = 0;
+    this->msi_next_source = 0;
 }
 
 void WCMCutGenerator::callback()
@@ -79,7 +108,7 @@ void WCMCutGenerator::callback()
 
     try
     {
-        // callback from the search at a given MIP node: including USER CUTS
+        // callback from the search at a given MIP node - may include USER CUTS
         if (where == GRB_CB_MIPNODE)
         {
             // node relaxation solution must be available at the current node
@@ -91,44 +120,51 @@ void WCMCutGenerator::callback()
                 if (getDoubleInfo(GRB_CB_MIPNODE_NODCNT) > 0)
                     this->at_root_relaxation = false;
 
+
             // retrieve relaxation solution
             y_val = this->getNodeRel(y_vars, num_vertices);
+            y_integral = check_integrality(y_val, num_vertices);
 
             bool separated = false;
+
+            // TO DO: BLOSSOM INEQUALITIES SEPARATION HERE
 
             if (SEPARATE_INDEGREE)
                 separated = run_indegree_separation(ADD_USER_CUTS);
 
             if (SEPARATE_MSI)
             {
-                if (!MSI_ONLY_IF_NO_INDEGREE || !separated)
+                if (y_integral || !MSI_FROM_INTEGER_POINTS_ONLY)
                 {
-                    if (SET_MAX_PRECISION_IN_SEPARATION)
-                        clean_vars_beyond_precision(SEPARATION_PRECISION);
+                    if (!MSI_ONLY_IF_NO_INDEGREE || !separated)
+                    {
+                        if (CLEAN_VARS_BEYOND_PRECISION)
+                            clean_vars_beyond_precision(SEPARATION_PRECISION);
 
-                    run_minimal_separators_separation(ADD_USER_CUTS);
+                        run_minimal_separators_separation(ADD_LAZY_CNTRS);
+                    }
                 }
             }
 
             delete[] y_val;
         }
 
-        // callback from a new MIP incumbent: including LAZY CONSTRAINTS
+        // callback from a new MIP incumbent: only LAZY CONSTRAINTS
         else if (where == GRB_CB_MIPSOL)
         {
             // retrieve solution
             y_val = this->getSolution(y_vars, num_vertices);
+            y_integral = check_integrality(y_val, num_vertices);
 
             bool separated = false;
 
-            if (SEPARATE_INDEGREE)
-                separated = run_indegree_separation(ADD_LAZY_CNTRS);
+            // TO DO: BLOSSOM INEQUALITIES SEPARATION HERE
 
             if (SEPARATE_MSI)
             {
-                if (!MSI_ONLY_IF_NO_INDEGREE || !separated)
+                if (!separated)
                 {
-                    if (SET_MAX_PRECISION_IN_SEPARATION)
+                    if (CLEAN_VARS_BEYOND_PRECISION)
                         clean_vars_beyond_precision(SEPARATION_PRECISION);
 
                     run_minimal_separators_separation(ADD_LAZY_CNTRS);
@@ -161,6 +197,8 @@ bool WCMCutGenerator::separate_lpr()
         for (long u = 0; u < num_vertices; ++u)
             y_val[u] = y_vars[u].get(GRB_DoubleAttr_X);
 
+        y_integral = check_integrality(y_val, num_vertices);
+
         bool indegree_cut = false;
         bool msi_cut = false;
 
@@ -171,7 +209,7 @@ bool WCMCutGenerator::separate_lpr()
         {
             if (!MSI_ONLY_IF_NO_INDEGREE || !indegree_cut)
             {
-                if (SET_MAX_PRECISION_IN_SEPARATION)
+                if (CLEAN_VARS_BEYOND_PRECISION)
                     clean_vars_beyond_precision(SEPARATION_PRECISION);
 
                 msi_cut = run_minimal_separators_separation(ADD_STD_CNTRS);
@@ -256,7 +294,7 @@ bool WCMCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
     {
         long u = instance->graph->s.at(idx);
         long v = instance->graph->t.at(idx);
-        if (y_val[u] > y_val[v] + EPSILON_TOL)
+        if (y_val[u] > y_val[v] + INDEGREE_EPSILON)
             indegree.at(v) += 1;
         else
             indegree.at(u) += 1;
@@ -268,7 +306,7 @@ bool WCMCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
         lhs_sum += ( (1 - indegree.at(u)) * y_val[u] );
 
     // 3. FOUND MOST VIOLATED INDEGREE INEQUALITY (IF ANY) IF LHS > 1
-    if (lhs_sum > 1 + EPSILON_TOL)
+    if (lhs_sum > 1 + INDEGREE_EPSILON)
     {
         // store inequality (caller method adds it to the model)
         GRBLinExpr violated_constr = 0;
@@ -293,11 +331,23 @@ bool WCMCutGenerator::run_minimal_separators_separation(int kind_of_cut)
     vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
     vector<long> cuts_rhs = vector<long>();
 
-    /* run separation algorithm from "Partitioning a graph into balanced
-     * connected classes - Formulations, separation and experiments", 2021,
-     * by [Miyazawa, Moura, Ota, Wakabayashi]
-     */
-    model_updated = separate_minimal_separators(cuts_lhs, cuts_rhs);
+    if (y_integral)
+    {
+        /* run natural separation algorithm based on depth-first search in the
+         * support graph - see for example "Thinning out Steiner trees - a node- 
+         * based model for uniform edge costs", 2016, by [Fischetti, Leitner,
+         * Ljubic, Luipersbeck, Monaci, Resch, Salvagnin, Sinnl]
+         */
+        model_updated = separate_minimal_separators_integral(cuts_lhs, cuts_rhs);
+    }
+    else
+    {
+        /* run separation algorithm from "Partitioning a graph into balanced
+         * connected classes - Formulations, separation and experiments", 2021,
+         * by [Miyazawa, Moura, Ota, Wakabayashi]
+         */
+        model_updated = separate_minimal_separators_std(cuts_lhs, cuts_rhs);
+    }
 
     if (model_updated)
     {
@@ -320,8 +370,185 @@ bool WCMCutGenerator::run_minimal_separators_separation(int kind_of_cut)
     return model_updated;
 }
 
-bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
-                                                  vector<long> &cuts_rhs)
+bool WCMCutGenerator::separate_minimal_separators_integral(vector<GRBLinExpr> &cuts_lhs,
+                                                           vector<long> &cuts_rhs)
+{
+    /***
+     * Solve the separation problem for minimal (a,b)-separator inequalities,
+     * assuming the current point is integral
+     */
+
+    vector<long> vars_at_one = vector<long>();
+    for (long u=0; u < num_vertices; ++u)
+        if (y_val[u] >= MSI_ONE)
+            vars_at_one.push_back(u);
+
+    long num_vars_at_one = vars_at_one.size();
+    if (num_vars_at_one < 2)
+        return false;
+
+    // 1. SUBGRAPH CONTAINING ONLY EDGES BETWEEN VERTICES AT ONE
+    vector< vector<long> > aux_adj_list;
+
+    // all vertices
+    for (long i = 0; i < num_vertices; ++i)
+        aux_adj_list.push_back(vector<long>());
+
+    // only edges between vertices at one
+    for (long i = 0; i < num_vars_at_one; ++i)
+        for (long j = i+1; j < num_vars_at_one; ++j)
+        {
+            long u = vars_at_one.at(i);
+            long v = vars_at_one.at(j);
+            if (instance->graph->index_matrix[u][v] >= 0)
+            {
+                // i-th vertex at one (u) adjacent to j-th one (v)
+                aux_adj_list[u].push_back(v);
+                aux_adj_list[v].push_back(u);
+            }
+        }
+
+    // 2. DFS IN THIS AUXILIARY GRAPH TAGGING CONNECTED COMPONENTS
+    vector<long> components = vector<long>(num_vertices, -1);
+    check_components(aux_adj_list, components);
+
+    // 3. GET TWO VARS Y_s = Y_t = 1, WITH s AND t IN DIFFERENT COMPONENTS
+    // NB! Trying to stick to the "rotating source" strategy to avoid favouring
+    // separators between vertices of smaller index
+    long s = -1;
+    vector<long>::iterator it = vars_at_one.begin();
+    while ( it != vars_at_one.end() && s < 0)
+    {
+        long v = *it;
+        if(v >= this->msi_next_source)
+            s = v;
+
+        ++it;
+    }
+
+    // msi_next_source not at 1, nor any vertex with larger index?
+    if (s < 0)
+        s = vars_at_one.front();
+
+    long t = -1;
+    it = vars_at_one.begin();
+    while ( it != vars_at_one.end() && t < 0)
+    {
+        long v = *it;
+        if(components.at(v) != components.at(s))
+            t = v;
+
+        ++it;
+    }
+
+    if (t < 0)
+    {
+        // no two vertices at 1 in two different components... INTEGER FEASIBLE POINT!
+        //cout << "### no two vertices at 1 in two different components... INTEGER FEASIBLE POINT" << endl;
+        return false;
+    }
+
+    // 4. DETERMINE VERTICES IN V\COMPONENT[s] THAT ARE ADJACENT TO SOME VERTEX IN COMPONENT[s]
+    vector<long> separator_vertices = vector<long>();
+    vector<bool> separator_mask = vector<bool>(num_vertices, false);
+    vector<bool> s_component_mask = vector<bool>(num_vertices, false);
+    for (long u=0; u < num_vertices; ++u)
+    {
+        if(components.at(u) == components.at(s))
+            s_component_mask.at(u) = true;
+        else
+        {
+            bool u_is_a_neighbour = false;
+            list<long>::iterator it = instance->graph->adj_list.at(u).begin();
+            while (it != instance->graph->adj_list.at(u).end() && !u_is_a_neighbour)
+            {
+                long v = *it;
+                if (components.at(v) == components.at(s))
+                    u_is_a_neighbour = true;
+
+                ++it;
+            }
+
+            if (u_is_a_neighbour)
+            {
+                separator_vertices.push_back(u);
+                separator_mask.at(u) = true;
+            }
+        }
+    }
+
+    // 5. FOUND A SEPARATOR, BUT NOW LIFT IT TO A MINIMAL ONE
+    #ifdef DEBUG_MSI_INTEGRAL
+        cout << "### (" << s << "," << t << ")- separator"
+             << endl;
+        cout << "### before lifting: { ";
+
+        for (vector<long>::iterator it = separator_vertices.begin();
+                                    it != separator_vertices.end(); ++it)
+            cout << *it << " ";
+
+        cout << "}" << endl;
+    #endif
+
+    lift_to_minimal_separator(separator_vertices, separator_mask, s, t);
+
+    #ifdef DEBUG_MSI_INTEGRAL
+        cout << "### after lifting: { ";
+
+        for (vector<long>::iterator it = separator_vertices.begin();
+                                    it != separator_vertices.end(); ++it)
+            cout << *it << " ";
+
+        cout << "}" << endl;
+    #endif
+
+    // 6. DETERMINE INEQUALITY
+
+    GRBLinExpr violated_constr = 0;
+
+    violated_constr += y_vars[s];
+    violated_constr += y_vars[t];
+
+    vector<long>::iterator it_S = separator_vertices.begin();
+    while (it_S != separator_vertices.end())
+    {
+        violated_constr += ( (-1) * y_vars[*it_S] );
+        ++it_S;
+    }
+
+    cuts_lhs.push_back(violated_constr);
+    cuts_rhs.push_back(1);
+
+    #ifdef DEBUG_MSI_INTEGRAL
+        double violating_lhs = 0;
+
+        cout << "### ADDED MSI: ";
+        cout << "y_" << s << " + y_" << t;
+
+        violating_lhs += y_val[s];
+        violating_lhs += y_val[t];
+
+        it_S = separator_vertices.begin();
+        while (it_S != separator_vertices.end())
+        {
+            cout << " - y_" << *it_S << "";
+            violating_lhs -= y_val[*it_S];
+            ++it_S;
+        }
+
+        cout << " <= 1 " << endl;
+        cout << right;
+        cout << setw(80) << "(lhs at current point "
+             << violating_lhs << ")" << endl;
+        cout << left;
+    #endif
+
+    this->msi_next_source++;
+    return true;
+}
+
+bool WCMCutGenerator::separate_minimal_separators_std(vector<GRBLinExpr> &cuts_lhs,
+                                                      vector<long> &cuts_rhs)
 {
     /// Solve the separation problem for minimal (a,b)-separator inequalities
 
@@ -345,14 +572,14 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
     for (long u = 0; u < num_vertices; ++u)
     {
         const double value = y_val[u];
-        if (value == 0)
+        if (value <= MSI_ZERO)  // == 0
         {
             // add only one vertex u_1 = u_2 in D
             D_vertices.push_back(D.addNode());
             D_idx_of_vertex[u] = D_size;
             ++D_size;
         }
-        else if(value > 0 && value < 1)
+        else if(value > MSI_ZERO && value < MSI_ONE)   // > 0 && < 1
         {
             // add two vertices u_1, u_2 in D
             D_vertices.push_back(D.addNode());
@@ -436,54 +663,73 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
 
         // the actual arcs (one or two, for each original edge) depend on
         // the reductions due to integral valued vars (7 cases... boring!)
-        if (y_val[u] == 1 && y_val[v] == 0)
+        // NB!
+        // "... >= MSI_ONE" means ... == 1; "... <= MSI_ZERO" means == 0
+        // "... >= MSI_ONE" means ... == 1; "... <= MSI_ZERO" means == 0
+        // "... >= MSI_ONE" means ... == 1; "... <= MSI_ZERO" means == 0
+
+        if (y_val[u] >= MSI_ONE && y_val[v] <= MSI_ZERO)
         {
             // CASE 1
             long uu = D_idx_of_vertex[u];
             long vv = D_idx_of_vertex[v];
+
             pair<long,long> uuvv = make_pair(uu,vv);
-
             D_arcs[uuvv] = D.addArc(D_vertices[uu], D_vertices[vv]);
-
             D_capacity[ D_arcs[uuvv] ] = UNLIMITED_CAPACITY;
+
+            //pair<long,long> vvuu = make_pair(vv,uu);
+            //D_arcs[vvuu] = D.addArc(D_vertices[vv], D_vertices[uu]);
+            //D_capacity[ D_arcs[vvuu] ] = UNLIMITED_CAPACITY;
         }
-        else if (y_val[u] == 0 && y_val[v] == 1)
+        else if (y_val[u] <= MSI_ZERO && y_val[v] >= MSI_ONE)
         {
             // CASE 2
             long uu = D_idx_of_vertex[u];
             long vv = D_idx_of_vertex[v];
+
             pair<long,long> vvuu = make_pair(vv,uu);
-
             D_arcs[vvuu] = D.addArc(D_vertices[vv], D_vertices[uu]);
-
             D_capacity[ D_arcs[vvuu] ] = UNLIMITED_CAPACITY;
+
+            //pair<long,long> uuvv = make_pair(uu,vv);
+            //D_arcs[uuvv] = D.addArc(D_vertices[uu], D_vertices[vv]);
+            //D_capacity[ D_arcs[uuvv] ] = UNLIMITED_CAPACITY;
         }
-        else if (y_val[u] == 0 && y_val[v] > 0
-                               && y_val[v] < 1)
+        else if (y_val[u] <= MSI_ZERO && y_val[v] > MSI_ZERO
+                                      && y_val[v] < MSI_ONE)
         {
             // CASE 3
             long uu = D_idx_of_vertex[u];
+            //long v1 = D_idx_of_vertex[v];
             long v2 = D_idx_of_vertex[v] + 1;
+
             pair<long,long> v2uu = make_pair(v2,uu);
-
             D_arcs[v2uu] = D.addArc(D_vertices[v2], D_vertices[uu]);
-
             D_capacity[ D_arcs[v2uu] ] = UNLIMITED_CAPACITY;
+
+            //pair<long,long> uuv1 = make_pair(uu,v1);
+            //D_arcs[uuv1] = D.addArc(D_vertices[uu], D_vertices[v1]);
+            //D_capacity[ D_arcs[uuv1] ] = UNLIMITED_CAPACITY;
         }
-        else if (y_val[u] > 0 && y_val[v] == 0 &&
-                 y_val[u] < 1)
+        else if (y_val[u] > MSI_ZERO && y_val[v] <= MSI_ZERO &&
+                 y_val[u] < MSI_ONE)
         {
             // CASE 4
+            //long u1 = D_idx_of_vertex[u];
             long u2 = D_idx_of_vertex[u] + 1;
             long vv = D_idx_of_vertex[v];
+
             pair<long,long> u2vv = make_pair(u2,vv);
-
             D_arcs[u2vv] = D.addArc(D_vertices[u2], D_vertices[vv]);
-
             D_capacity[ D_arcs[u2vv] ] = UNLIMITED_CAPACITY;
+
+            //pair<long,long> vvu1 = make_pair(vv,u1);
+            //D_arcs[vvu1] = D.addArc(D_vertices[vv], D_vertices[u1]);
+            //D_capacity[ D_arcs[vvu1] ] = UNLIMITED_CAPACITY;
         }
-        else if (y_val[u] > 0 && y_val[v] == 1 &&
-                 y_val[u] < 1)
+        else if (y_val[u] > MSI_ZERO && y_val[v] >= MSI_ONE &&
+                 y_val[u] < MSI_ONE)
         {
             // CASE 5
             long u1 = D_idx_of_vertex[u];
@@ -498,8 +744,8 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             D_capacity[ D_arcs[u2vv] ] = UNLIMITED_CAPACITY;
             D_capacity[ D_arcs[vvu1] ] = UNLIMITED_CAPACITY;
         }
-        else if (y_val[u] == 1 && y_val[v] > 0
-                               && y_val[v] < 1)
+        else if (y_val[u] >= MSI_ONE && y_val[v] > MSI_ZERO
+                                     && y_val[v] < MSI_ONE)
         {
             // CASE 6
             long uu = D_idx_of_vertex[u];
@@ -514,8 +760,8 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
             D_capacity[ D_arcs[v2uu] ] = UNLIMITED_CAPACITY;
             D_capacity[ D_arcs[uuv1] ] = UNLIMITED_CAPACITY;
         }
-        else if (y_val[u] > 0 && y_val[v] > 0 &&
-                 y_val[u] < 1 && y_val[v] < 1  )
+        else if (y_val[u] > MSI_ZERO && y_val[v] > MSI_ZERO &&
+                 y_val[u] < MSI_ONE  && y_val[v] < MSI_ONE  )
         {
             // CASE 7
             long u1 = D_idx_of_vertex[u];
@@ -538,20 +784,23 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
      * MSI CANNOT BE VIOLATED OTHERWISE)
      */
 
-    long s = 0;
-    while (s < num_vertices)
+    bool done = false;
+    long num_trials = 0;
+    while (num_trials < num_vertices && !done)
     {
+        // "cycling" through the initial source vertex tried (only relevant with MSI_STRATEGY_FIRST_CUT)
+        long s = this->msi_next_source;
         long t = s+1;
-        while (t < num_vertices)
+        while (t < num_vertices && !done)
         {
             // wanted: a (s_2, t_1) separating cut
-            long s_in_D = (y_val[s] > 0 && y_val[s] < 1) ? D_idx_of_vertex[s]+1
-                                                         : D_idx_of_vertex[s];
+            long s_in_D = (y_val[s] > MSI_ZERO && y_val[s] < MSI_ONE) ? D_idx_of_vertex[s]+1
+                                                                      : D_idx_of_vertex[s];
 
             long t_in_D = D_idx_of_vertex[t];
 
             if ( instance->graph->index_matrix[s][t] < 0 &&  // non-adjacent
-                 y_val[s] + y_val[t] > 1 &&                  // might cut y*
+                 y_val[s] + y_val[t] > 1+MSI_EPSILON &&      // might cut y*
                  s_in_D != t_in_D )                          // not contracted
             {
                 // 3. MAX FLOW COMPUTATION
@@ -574,7 +823,7 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                 // 4. IF THE MIN CUT IS LESS THAN WHAT THE MSI PRESCRIBES
                 // (UP TO A VIOLATION TOLERANCE), WE FOUND A CUT
 
-                if (mincut < y_val[s] + y_val[t] - 1 - MSI_VIOLATION_TOL)
+                if (mincut < y_val[s] + y_val[t] - 1 - MSI_EPSILON)
                 {
                     // 5. DETERMINE VERTICES IN ORIGINAL GRAPH CORRESPONDING
                     // TO ARCS IN THE MIN CUT
@@ -591,9 +840,9 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                             // query if u1 is on the source side of the min cut
                             if ( s_t_preflow.minCut(D_vertices[u_in_D]) )
                             {
-                                bool u_at_zero = y_val[u] == 0;
+                                bool u_at_zero = y_val[u] <= MSI_ZERO;
 
-                                bool u_frac = y_val[u] > 0 && y_val[u] < 1;
+                                bool u_frac = y_val[u] > MSI_ZERO && y_val[u] < MSI_ONE;
 
                                 long u2_in_D = u_frac ? D_idx_of_vertex[u]+1
                                                       : D_idx_of_vertex[u];
@@ -673,13 +922,17 @@ bool WCMCutGenerator::separate_minimal_separators(vector<GRBLinExpr> &cuts_lhs,
                              << violating_lhs << ")" << endl;
                         cout << left;
                     #endif
+
+                    if (MSI_STRATEGY_FIRST_CUT && !at_root_relaxation)
+                        done = true;
                 }
             }
 
             ++t;
         }
 
-        ++s;
+        this->msi_next_source = (this->msi_next_source+1) % num_vertices;
+        ++num_trials;
     }
 
     return (cuts_lhs.size() > 0);

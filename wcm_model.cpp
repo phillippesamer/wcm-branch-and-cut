@@ -6,6 +6,8 @@ bool GRB_CUTS = true;            // gurobi (automatic) cuts on/off
 bool GRB_HEURISTICS = true;      // gurobi (automatic) heuristics on/off
 bool GRB_PREPROCESSING = true;   // gurobi (automatic) preprocessing on/off
 
+const double EPSILON_TOL = 1e-5;
+
 WCMModel::WCMModel(IO *instance)
 {
     this->instance = instance;
@@ -66,7 +68,7 @@ void WCMModel::create_variables()
     for (long u = 0; u < instance->graph->num_vertices; ++u)
     {
         sprintf(buffer, "y_%ld", u);
-        y[u] = model->addVar(0.0, 1.0, 0.0, GRB_BINARY, buffer);
+        y[u] = model->addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, buffer);
     }
 
     model->update();
@@ -220,7 +222,10 @@ bool WCMModel::check_solution()
             }
 
             if (!chosen_vertex_indeed_covered)
+            {
+                cout << endl << "ERROR (X~Y VAR LINK): chosen vertex not covered by a matching edge" << endl;
                 return false;
+            }
         }
         else
         {
@@ -232,11 +237,24 @@ bool WCMModel::check_solution()
                 long v = *it;
                 long edge_idx = instance->graph->index_matrix[u][v];
                 if (solution_vector_x.at(edge_idx))
+                {
                     missing_vertex_indeed_not_covered = false;
+
+                    cout << "y[u=" << u << "] = " << setw(20) << fixed << setprecision(16) << y[u].get(GRB_DoubleAttr_X)
+                         << "    (and solution_vector_y.at(u)=" << solution_vector_y.at(u) << ")" << endl;
+                    cout << "y[v=" << v << "] = " << setw(20) << fixed << setprecision(16) << y[v].get(GRB_DoubleAttr_X)
+                         << "    (and solution_vector_y.at(v)=" << solution_vector_y.at(v) << ")" << endl;
+                    cout << "uv is edge #" << edge_idx << " in the graph" << endl;
+                    cout << "x[" << edge_idx << "] = " << setw(20) << fixed << setprecision(16) << x[edge_idx].get(GRB_DoubleAttr_X)
+                         << "    (and solution_vector_x.at(edge_idx)=" << solution_vector_x.at(edge_idx) << ")" << endl;
+                }
             }
 
             if (!missing_vertex_indeed_not_covered)
+            {
+                cout << endl << "ERROR (X~Y VAR LINK): unchosen vertex is actually covered by a matching edge" << endl;
                 return false;
+            }
         }
     }
 
@@ -260,12 +278,15 @@ bool WCMModel::check_solution()
     }
 
     if (!still_a_matching)
+    {
+        cout << endl << "ERROR (MATCHING): some vertex has degree above 1" << endl;
         return false;
+    }
 
 
     // III. Y VARS INDUCE A CONNECTED SUBGRAPH
 
-    bool done = false;
+    long num_components = 0;
     vector<bool> seen = vector<bool>(instance->graph->num_vertices, false);
 
     for (long u = 0; u < instance->graph->num_vertices; ++u)
@@ -273,14 +294,17 @@ bool WCMModel::check_solution()
         // should enter only once, from the first covered vertex 
         if (solution_vector_y.at(u) && !seen.at(u))
         {
-            if (done)
-                return false;   // u not found earlier!
-            else
-            {
-                dfs_to_tag_component(u, seen);
-                done = true;
-            }
+            dfs_to_tag_component(u, seen);
+            ++num_components;
         }
+    }
+
+    if (num_components > 1)
+    {
+        cout << endl
+             << "ERROR (CONNECTIVITY): subgraph induced by y is not connected ("
+             << num_components << " components)" << endl;
+        return false;
     }
 
     return true;
@@ -402,7 +426,7 @@ void WCMModel::fill_solution_vectors()
     solution_output << "### Solution matching:" << endl;
     for (long e = 0; e < instance->graph->num_edges; ++e)
     {
-        if (this->x[e].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
+        if (this->x[e].get(GRB_DoubleAttr_X) >= 0.5)
         {
             this->solution_vector_x.at(e) = true;
 
@@ -416,7 +440,7 @@ void WCMModel::fill_solution_vectors()
 
     for (long u = 0; u < instance->graph->num_vertices; ++u)
     {
-        if (this->y[u].get(GRB_DoubleAttr_X) > 1-EPSILON_TOL)
+        if (this->y[u].get(GRB_DoubleAttr_X) >= 0.5)
         {
             this->solution_vector_y.at(u) = true;
 
@@ -450,8 +474,10 @@ bool WCMModel::solve_lp_relax(bool logging)
         // make vars continuous
         for (long e = 0; e < instance->graph->num_edges; ++e)
             x[e].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
-        for (long u = 0; u < instance->graph->num_vertices; ++u)
-            y[u].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
+
+        // TO DO: no need to tell the solver that y needs to be integral, right?
+        // for (long u = 0; u < instance->graph->num_vertices; ++u)
+        //     y[u].set(GRB_CharAttr_VType, GRB_CONTINUOUS);
 
         // calculating wall clock time to solve LP relaxation
         struct timeval *clock_start
@@ -543,8 +569,10 @@ bool WCMModel::solve_lp_relax(bool logging)
             model->set(GRB_IntParam_Cuts, -1);
             for (long e = 0; e < instance->graph->num_edges; ++e)
                 x[e].set(GRB_CharAttr_VType, GRB_BINARY);
-            for (long u = 0; u < instance->graph->num_vertices; ++u)
-                y[u].set(GRB_CharAttr_VType, GRB_BINARY);
+
+            // TO DO: no need to tell the solver that y needs to be integral, right?
+            // for (long u = 0; u < instance->graph->num_vertices; ++u)
+            //     y[u].set(GRB_CharAttr_VType, GRB_BINARY);
 
             model->update();
 
@@ -552,7 +580,7 @@ bool WCMModel::solve_lp_relax(bool logging)
         }
         else if (model->get(GRB_IntAttr_Status) == GRB_INFEASIBLE)
         {
-            cout << "LP relaxation infeasible!" << endl;
+            cout << "Unexpected error: LP relaxation infeasible!" << endl;
             cout << "Model runtime: " << lp_runtime << endl;
             return false;
         }

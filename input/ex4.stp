@@ -1,0 +1,36 @@
+BLABLIBLU STP File, STP Format Version 1.0
+
+SECTION Comments
+Name "Ex4"
+Creator "I"
+Problem "Maximum Weight Connected Matching"
+END
+
+SECTION Graph
+Nodes 9
+Edges 9
+E 1 2
+E 1 7
+E 2 8
+E 3 4
+E 4 8
+E 4 9
+E 5 6
+E 5 9
+E 6 7
+END
+
+SECTION Terminals
+Terminals 9
+T 1 9
+T 2 9
+T 3 9
+T 4 9
+T 5 9
+T 6 9
+T 7 -10
+T 8 -10
+T 9 -10
+END
+
+EOF
