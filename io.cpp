@@ -95,9 +95,14 @@ bool IO::parse_gcc_file(string filename)
     return true;
 }
 
-bool IO::parse_stp_file(string filename)
+bool IO::parse_stp_file(string filename, bool edge_weights_given)
 {
-    /// Steiner Tree Problem format used in DIMACS challenge benchmark instances
+    /***
+     * Steiner Tree Problem format used in DIMACS challenge benchmark instances
+     * If edge_weights_given is set to true, edge weights are expected in each
+     * edge line. Otherwise, we add the weights of the endpoint vertices of each
+     * edge to determine its weight.
+     */
 
     // instance id from file name: what's after last slash and before last dot
     size_t dot_pos = filename.find_last_of(".");
@@ -144,6 +149,13 @@ bool IO::parse_stp_file(string filename)
             --i;
             --j;
 
+            if (edge_weights_given)
+            {
+                double weight;
+                input_fh >> weight;
+                graph->w.push_back(weight);
+            }
+
             graph->s.push_back(i);
             graph->t.push_back(j);
             
@@ -164,46 +176,48 @@ bool IO::parse_stp_file(string filename)
             graph->index_matrix[j][i] = line_idx;
         }
 
-        /**
-         * 4. ADVANCE TO TERMINALS SECTION: USING VERTEX WEIGHT TO DETERMINE 
-         * EDGE WEIGHTS. EACH EDGE IS ASSIGNED A WEIGHT EQUAL TO THE SUM OF THE
-         * WEIGHTS OF ITS TERMINALS.
-         */
-
-        do
+        if (!edge_weights_given)
         {
+            /**
+             * 4. ADVANCE TO TERMINALS SECTION: USING VERTEX WEIGHT TO DETERMINE 
+             * EDGE WEIGHTS. EACH EDGE IS ASSIGNED A WEIGHT EQUAL TO THE SUM OF THE
+             * WEIGHTS OF ITS TERMINALS.
+             */
+            do
+            {
+                getline(input_fh, line);
+            }
+            while(line.find("SECTION Terminals") == string::npos);
+
+            // skip line for number of terminals e.g. "Terminals 2853"
             getline(input_fh, line);
-        }
-        while(line.find("SECTION Terminals") == string::npos);
 
-        // skip line for number of terminals e.g. "Terminals 2853"
-        getline(input_fh, line);
+            // n lines for vertex weights (not given in order...!)
+            vector<double> tmp_vertex_weights = vector<double>(num_vertices, 0.0);
+            for (long line_idx = 0; line_idx < num_vertices; ++line_idx)
+            {
+                // must skip a word (the terminal line marker "T"): e.g. "T 2064 -10.5885201522015"
+                input_fh >> word;
 
-        // n lines for vertex weights (not given in order...!)
-        vector<double> tmp_vertex_weights = vector<double>(num_vertices, 0.0);
-        for (long line_idx = 0; line_idx < num_vertices; ++line_idx)
-        {
-            // must skip a word (the terminal line marker "T"): e.g. "T 2064 -10.5885201522015"
-            input_fh >> word;
+                // NB! Remember: in this format, the vertices are labeled in [1, n]
+                long u;
+                input_fh >> u;
+                --u;
 
-            // NB! Remember: in this format, the vertices are labeled in [1, n]
-            long u;
-            input_fh >> u;
-            --u;
+                double w;
+                input_fh >> w;
+                tmp_vertex_weights.at(u) = w;
+            }
 
-            double w;
-            input_fh >> w;
-            tmp_vertex_weights.at(u) = w;
-        }
-
-        for (long e = 0; e < num_edges; ++e)
-        {
-            long v1 = graph->s.at(e);
-            long v2 = graph->t.at(e);
-            
-            double w = tmp_vertex_weights.at(v1) + tmp_vertex_weights.at(v2);
-            
-            graph->w.push_back(w);
+            for (long e = 0; e < num_edges; ++e)
+            {
+                long v1 = graph->s.at(e);
+                long v2 = graph->t.at(e);
+                
+                double w = tmp_vertex_weights.at(v1) + tmp_vertex_weights.at(v2);
+                
+                graph->w.push_back(w);
+            }
         }
 
         #ifdef DEBUG
@@ -213,8 +227,8 @@ bool IO::parse_stp_file(string filename)
                  << endl << "  m  = " << num_edges
                  << endl << "  edge 0  = {" << graph->s.at(0) << ", " << graph->t.at(0) << "}"
                  << endl << "  edge " << graph->s.size() << "  = {" << graph->s.back() << ", " << graph->t.back() << "}"
-                 << endl << "  tmp_weight of v0 = " << tmp_vertex_weights.at(0)
-                 << endl << "  tmp_weight of v" << num_vertices-1 << " = " << tmp_vertex_weights.at(num_vertices-1)
+                 //<< endl << "  tmp_weight of v0 = " << tmp_vertex_weights.at(0)
+                 //<< endl << "  tmp_weight of v" << num_vertices-1 << " = " << tmp_vertex_weights.at(num_vertices-1)
                  << endl << "  weight of edge 0 = " << graph->w.at(0)
                  << endl << "  weight of edge " << graph->w.size() << " = " << graph->w.back()
                  << endl << endl;
@@ -255,19 +269,20 @@ void IO::save_lpr_info(double lp_bound, double lp_time)
     summary_info << setw(8) << "  &&  ";
 }
 
-void IO::save_ip_info(long lb,
-                      long ub,
+void IO::save_ip_info(double lb,
+                      double ub,
                       double gap,
                       double time,
                       long node_count,
+                      long blossom_count,
                       long msi_count,
                       long indegree_count)
 {
     /// save mip info: lb ub gap time #nodes #msi #indegree
 
-    summary_info << setw(8) << lb;
+    summary_info << setw(8) << fixed << setprecision(2) << lb;
     summary_info << setw(8) << "  &  ";
-    summary_info << setw(8) << ub;
+    summary_info << setw(8) << fixed << setprecision(2) << ub;
 
     double percentual_gap = 100 * gap;
     summary_info << setw(8) << "  &  ";
@@ -277,6 +292,8 @@ void IO::save_ip_info(long lb,
     summary_info << setw(8) << fixed << setprecision(2) << time;
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << node_count;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << blossom_count;
     summary_info << setw(8) << "  &  ";
     summary_info << setw(8) << msi_count;
     summary_info << setw(8) << "  &  ";

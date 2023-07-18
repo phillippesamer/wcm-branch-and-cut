@@ -12,6 +12,7 @@
 #include <lemon/concepts/digraph.h>
 #include <lemon/smart_graph.h>
 #include <lemon/preflow.h>
+#include <lemon/gomory_hu.h>
 using namespace lemon;
 
 #include "io.h"
@@ -37,7 +38,7 @@ using namespace lemon;
 class WCMCutGenerator: public GRBCallback
 {
 public:
-    WCMCutGenerator(GRBModel*, GRBVar*, IO*);
+    WCMCutGenerator(GRBModel*, GRBVar*, GRBVar*, IO*);
     virtual ~WCMCutGenerator() { }
 
 protected:
@@ -50,12 +51,17 @@ protected:
     IO *instance;
     GRBModel *model;
     long num_vertices;
+    long num_edges;
     bool at_root_relaxation;
 
-    GRBVar *y_vars;
-    double *y_val;
-    bool y_integral;
+    GRBVar *x_vars, *y_vars;
+    double *x_val, *y_val;
+    bool x_integral, y_integral;
     void inline clean_vars_beyond_precision(int);
+
+    long blossom_counter;
+    bool run_blossom_separation(int);
+    bool separate_blossom(vector<GRBLinExpr> &, vector<long> &);
 
     long indegree_counter;
     bool run_indegree_separation(int);

@@ -4,6 +4,7 @@
 
 bool SEPARATE_MSI = true;              // MSI = minimal separator inequalities
 bool SEPARATE_INDEGREE = true;
+bool SEPARATE_BLOSSOM = true;
 
 bool MSI_FROM_INTEGER_POINTS_ONLY = false; // weaker but faster node relaxation
 bool MSI_STRATEGY_FIRST_CUT = true;    // only used when separating fract.points
@@ -83,16 +84,20 @@ bool inline check_integrality(double *point, long dim)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar *y_vars, IO *instance)
+WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar *x_vars, GRBVar *y_vars, IO *instance)
 {
     this->model = model;
+    this->x_vars = x_vars;
     this->y_vars = y_vars;
+    this->x_integral = false;
     this->y_integral = false;
     this->instance = instance;
     this->num_vertices = instance->graph->num_vertices;
+    this->num_edges = instance->graph->num_edges;
 
     this->at_root_relaxation = true;
 
+    this->blossom_counter = 0;
     this->indegree_counter = 0;
     this->minimal_separators_counter = 0;
     this->msi_next_source = 0;
@@ -120,14 +125,16 @@ void WCMCutGenerator::callback()
                 if (getDoubleInfo(GRB_CB_MIPNODE_NODCNT) > 0)
                     this->at_root_relaxation = false;
 
-
             // retrieve relaxation solution
+            x_val = this->getNodeRel(x_vars, num_edges);
             y_val = this->getNodeRel(y_vars, num_vertices);
+            x_integral = check_integrality(x_val, num_edges);
             y_integral = check_integrality(y_val, num_vertices);
 
             bool separated = false;
 
-            // TO DO: BLOSSOM INEQUALITIES SEPARATION HERE
+            if (SEPARATE_BLOSSOM && !x_integral)
+                separated = run_blossom_separation(ADD_USER_CUTS);
 
             if (SEPARATE_INDEGREE)
                 separated = run_indegree_separation(ADD_USER_CUTS);
@@ -146,6 +153,7 @@ void WCMCutGenerator::callback()
                 }
             }
 
+            delete[] x_val;
             delete[] y_val;
         }
 
@@ -157,8 +165,6 @@ void WCMCutGenerator::callback()
             y_integral = check_integrality(y_val, num_vertices);
 
             bool separated = false;
-
-            // TO DO: BLOSSOM INEQUALITIES SEPARATION HERE
 
             if (SEPARATE_MSI)
             {
@@ -193,14 +199,23 @@ bool WCMCutGenerator::separate_lpr()
     try
     {
         // retrieve relaxation solution
+        x_val = new double[num_edges];
+        for (long e = 0; e < num_edges; ++e)
+            x_val[e] = x_vars[e].get(GRB_DoubleAttr_X);
+
         y_val = new double[num_vertices];
         for (long u = 0; u < num_vertices; ++u)
             y_val[u] = y_vars[u].get(GRB_DoubleAttr_X);
 
+        x_integral = check_integrality(x_val, num_edges);
         y_integral = check_integrality(y_val, num_vertices);
 
+        bool blossom_cut = false;
         bool indegree_cut = false;
         bool msi_cut = false;
+
+        if (SEPARATE_BLOSSOM && !x_integral)
+            blossom_cut = run_blossom_separation(ADD_STD_CNTRS);
 
         if (SEPARATE_INDEGREE)
             indegree_cut = run_indegree_separation(ADD_STD_CNTRS);
@@ -216,9 +231,10 @@ bool WCMCutGenerator::separate_lpr()
             }
         }
 
+        delete[] x_val;
         delete[] y_val;
 
-        return (indegree_cut || msi_cut);
+        return (blossom_cut || indegree_cut || msi_cut);
     }
     catch (GRBException e)
     {
@@ -242,6 +258,53 @@ void WCMCutGenerator::clean_vars_beyond_precision(int precision)
         tmp = std::round(tmp);
         y_val[u] = tmp * std::pow(10, -precision);
     }
+}
+
+bool WCMCutGenerator::run_blossom_separation(int kind_of_cut)
+{
+    /// wrapper for the separation procedure to suit different execution contexts
+
+    bool model_updated = false;
+
+    // eventual cuts are stored here
+    vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
+    vector<long> cuts_rhs = vector<long>();
+
+    /* run separation algorithm from "A faster exact separation algorithm for
+     * blossom inequalities", 2004, by [Letchford, Reinelt, Theis]
+     */
+    model_updated = separate_blossom(cuts_lhs, cuts_rhs);
+
+    if (model_updated)
+    {
+        // add cuts
+        for (unsigned long idx = 0; idx<cuts_lhs.size(); ++idx)
+        {
+            ++blossom_counter;
+
+            if (kind_of_cut == ADD_USER_CUTS)
+                addCut(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else if (kind_of_cut == ADD_LAZY_CNTRS)
+                addLazy(cuts_lhs[idx] <= cuts_rhs[idx]);
+
+            else // kind_of_cut == ADD_STD_CNTRS
+                model->addConstr(cuts_lhs[idx] <= cuts_rhs[idx]);
+        }
+    }
+
+    return model_updated;
+}
+
+bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
+                                       vector<long> &cuts_rhs)
+{
+    /// Solve the separation problem for blossom inequalities
+
+    // TO DO: ALL
+    cout << "blossom cut: --" << endl;
+
+    return (cuts_lhs.size() > 0);
 }
 
 bool WCMCutGenerator::run_indegree_separation(int kind_of_cut)
@@ -284,8 +347,6 @@ bool WCMCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
                                         vector<long> &cuts_rhs)
 {
     /// Solve the separation problem for indegree inequalities
-
-    const long num_edges = instance->graph->num_edges;
 
     vector<long> indegree = vector<long>(num_vertices, 0);
 

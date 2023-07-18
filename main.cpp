@@ -30,22 +30,26 @@ int main(int argc, char **argv)
 
     IO* instance = new IO();
 
-    if (argc != 2)
+    if (argc < 2)
     {
         cout << endl << "usage: \t" << argv[0]
-             << " [input instance path]" << endl << endl;
+             << " input_instance_path [-e]" << endl << endl;
+        cout << "[-e]: flag indicating .stp format instance WITH edge weights"
+             << endl << endl;
 
         delete instance;
         return 0;
     }
     else
     {
+        bool stp_with_edge_weights = (argc > 2);
+
         string file_path = string(argv[1]);
         string file_extension = file_path.substr(file_path.find_last_of(".")+1);
 
         bool successful_parsing = (file_extension.compare("gcc") == 0) ?
                                   instance->parse_gcc_file(file_path) :
-                                  instance->parse_stp_file(file_path);
+                                  instance->parse_stp_file(file_path, stp_with_edge_weights);
 
         if (!successful_parsing)
         {
@@ -78,6 +82,7 @@ int main(int argc, char **argv)
                                model->get_mip_gap(),
                                model->get_mip_runtime(),
                                model->get_mip_num_nodes(),
+                               model->get_mip_blossom_counter(),
                                model->get_mip_msi_counter(),
                                model->get_mip_indegree_counter());
 

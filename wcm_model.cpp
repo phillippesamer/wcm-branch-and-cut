@@ -30,7 +30,7 @@ WCMModel::WCMModel(IO *instance)
         create_constraints();
         create_objective();
 
-        this->cutgen = new WCMCutGenerator(model, y, instance);
+        this->cutgen = new WCMCutGenerator(model, x, y, instance);
 
         //model->write("wcm.lp");
     }
@@ -165,12 +165,15 @@ int WCMModel::solve(bool logging)
         // must set parameter indicating presence of lazy constraints
         model->set(GRB_IntParam_LazyConstraints, 1);
 
-        // trigger b&c separating minimal separator and indegree inequalities 
+        // trigger b&c separating blossom, minimal separator and indegree inequalities 
         model->setCallback(this->cutgen);
         model->optimize();
 
         if (logging)
         {
+            cout << "Blossom inequalities added: "
+                 <<  cutgen->blossom_counter << endl;
+
             cout << "Minimal separator inequalities added: "
                  <<  cutgen->minimal_separators_counter << endl;
 
@@ -558,6 +561,9 @@ bool WCMModel::solve_lp_relax(bool logging)
 
             if (logging)
             {
+                cout << "Blossom inequalities added: "
+                     <<  cutgen->blossom_counter << endl;
+
                 cout << "Minimal separator inequalities added: "
                      <<  cutgen->minimal_separators_counter << endl;
 
@@ -626,12 +632,17 @@ long WCMModel::get_mip_num_nodes()
     return model->get(GRB_DoubleAttr_NodeCount);
 }
 
-long WCMModel::get_mip_msi_counter()
+long WCMModel::get_mip_blossom_counter()
 {
-    return cutgen->minimal_separators_counter;
+    return cutgen->blossom_counter;
 }
 
 long WCMModel::get_mip_indegree_counter()
 {
     return cutgen->indegree_counter;
+}
+
+long WCMModel::get_mip_msi_counter()
+{
+    return cutgen->minimal_separators_counter;
 }

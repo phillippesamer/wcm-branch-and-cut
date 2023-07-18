@@ -52,8 +52,9 @@ public:
     double get_mip_runtime();
     double get_mip_gap();
     long get_mip_num_nodes();
-    long get_mip_msi_counter();
+    long get_mip_blossom_counter();
     long get_mip_indegree_counter();
+    long get_mip_msi_counter();
 
 protected:
     IO *instance;
