@@ -2,17 +2,19 @@
 
 /// algorithm setup switches
 
-bool SEPARATE_MSI = true;              // MSI = minimal separator inequalities
-bool SEPARATE_INDEGREE = true;
+bool SEPARATE_MSI = false;              // MSI = minimal separator inequalities
+bool SEPARATE_INDEGREE = false;
 bool SEPARATE_BLOSSOM = true;
 
 bool MSI_FROM_INTEGER_POINTS_ONLY = false; // weaker but faster node relaxation
 bool MSI_STRATEGY_FIRST_CUT = true;    // only used when separating fract.points
 bool MSI_ONLY_IF_NO_INDEGREE = false;  // only used when separating fract.points
 
+bool BLOSSOM_AT_ROOT_ONLY = false;
+
 // clean any bits beyond the corresponding precision to avoid numerical errors?
 // (at most 14, since gurobi does not support long double yet...)
-// NB! THIS OPTION MIGHT RISK MISSING A VIOLATED INEQUALITY DUE
+// NB! THIS OPTION MIGHT RISK MISSING A VIOLATED INEQUALITY
 const bool CLEAN_VARS_BEYOND_PRECISION = false;
 const int SEPARATION_PRECISION = 14;
 
@@ -101,6 +103,55 @@ WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar *x_vars, GRBVar *y_vars
     this->indegree_counter = 0;
     this->minimal_separators_counter = 0;
     this->msi_next_source = 0;
+
+    /***
+     * Support graph (using LEMON) to separate blossom inequalities (BI)
+     * We construct the support graph only once, and update only the edge
+     * capacities from the current relaxation values.
+     */
+
+    this->bi_support_graph = new ListGraph();
+    this->bi_support_vertices.reserve(this->num_vertices + 1);
+    this->bi_support_inverted_index = new ListGraph::NodeMap<long>(*bi_support_graph);
+    this->bi_support_edges.reserve(this->num_edges + this->num_vertices);
+    this->bi_support_capacity = NULL;
+
+    if (SEPARATE_BLOSSOM)
+    {
+        // n vertices from instance graph, plus an artificial/dummy universal one
+        for (long i=0; i < num_vertices+1; ++i)
+        {
+            bi_support_vertices.push_back(bi_support_graph->addNode());
+            (*bi_support_inverted_index)[bi_support_vertices.back()] = i;
+        }
+
+        // m edges as in the instance graph, plus one from dummy to each vertex
+        for (long idx=0; idx<num_edges; ++idx)
+        {
+            long v1 = instance->graph->s.at(idx);
+            long v2 = instance->graph->t.at(idx);
+            ListGraph::Edge e = bi_support_graph->addEdge(bi_support_vertices.at(v1),
+                                                          bi_support_vertices.at(v2));
+            bi_support_edges.push_back(e);
+        }
+
+        for (long idx=0; idx<num_vertices; ++idx)
+        {
+            long v1 = num_vertices;  // dummy vertex
+            long v2 = idx;
+            ListGraph::Edge e = bi_support_graph->addEdge(bi_support_vertices.at(v1),
+                                                          bi_support_vertices.at(v2));
+            bi_support_edges.push_back(e);
+        }
+    }
+}
+
+WCMCutGenerator::~WCMCutGenerator()
+{
+    this->bi_support_vertices.clear();
+    this->bi_support_edges.clear();
+    delete bi_support_inverted_index;
+    delete bi_support_graph;
 }
 
 void WCMCutGenerator::callback()
@@ -131,11 +182,13 @@ void WCMCutGenerator::callback()
             x_integral = check_integrality(x_val, num_edges);
             y_integral = check_integrality(y_val, num_vertices);
 
-            bool separated = false;
-
             if (SEPARATE_BLOSSOM && !x_integral)
-                separated = run_blossom_separation(ADD_USER_CUTS);
+            {
+                if (at_root_relaxation || !BLOSSOM_AT_ROOT_ONLY)
+                    run_blossom_separation(ADD_USER_CUTS);
+            }
 
+            bool separated = false;
             if (SEPARATE_INDEGREE)
                 separated = run_indegree_separation(ADD_USER_CUTS);
 
@@ -164,17 +217,12 @@ void WCMCutGenerator::callback()
             y_val = this->getSolution(y_vars, num_vertices);
             y_integral = check_integrality(y_val, num_vertices);
 
-            bool separated = false;
-
             if (SEPARATE_MSI)
             {
-                if (!separated)
-                {
-                    if (CLEAN_VARS_BEYOND_PRECISION)
-                        clean_vars_beyond_precision(SEPARATION_PRECISION);
+                if (CLEAN_VARS_BEYOND_PRECISION)
+                    clean_vars_beyond_precision(SEPARATION_PRECISION);
 
-                    run_minimal_separators_separation(ADD_LAZY_CNTRS);
-                }
+                run_minimal_separators_separation(ADD_LAZY_CNTRS);
             }
 
             delete[] y_val;
@@ -260,6 +308,8 @@ void WCMCutGenerator::clean_vars_beyond_precision(int precision)
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 bool WCMCutGenerator::run_blossom_separation(int kind_of_cut)
 {
     /// wrapper for the separation procedure to suit different execution contexts
@@ -270,8 +320,9 @@ bool WCMCutGenerator::run_blossom_separation(int kind_of_cut)
     vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
     vector<long> cuts_rhs = vector<long>();
 
-    /* run separation algorithm from "A faster exact separation algorithm for
-     * blossom inequalities", 2004, by [Letchford, Reinelt, Theis]
+    /* run classical separation algorithm from Padberg & Rao (1982) - still the
+     * most efficient for the uncapacitated case cf. "Odd minimum cut sets and
+     * b-matchings revisited", 2008, by [Letchford, Reinelt, Theis]
      */
     model_updated = separate_blossom(cuts_lhs, cuts_rhs);
 
@@ -301,11 +352,197 @@ bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
 {
     /// Solve the separation problem for blossom inequalities
 
-    // TO DO: ALL
-    cout << "blossom cut: --" << endl;
+    // 1. DETERMINE UPDATED EDGE CAPACITIES FROM THE CURRENT RELAXATION
+
+    bi_support_capacity = new ListGraph::EdgeMap<double>(*bi_support_graph);
+
+    // edge uv from the instance graph: capacity[uv] = x*_uv
+    for (long idx=0; idx < num_edges; ++idx)
+    {
+        ListGraph::Edge edge = bi_support_edges.at(idx);
+        (*bi_support_capacity)[edge] = x_val[idx];
+    }
+
+    // edge ru from dummy vertex to u (NB! using x~y linking constraints here!):
+    // capacity[ru]  =  1 - \sum_{v neighbour of u} x*_uv  =  1 - y*_u
+    for (long idx=0; idx < num_vertices; ++idx)
+    {
+        long dummy_edge_idx = num_edges + idx;
+        ListGraph::Edge edge = bi_support_edges.at(dummy_edge_idx);
+
+        // y_u is the sum of x_uv for v neighbours of u
+        (*bi_support_capacity)[edge] = 1.0 - y_val[idx];
+    }
+
+    // 2. CONSTRUCT GOMORY-HU CUT TREE OF THE SUPPORT GRAPH
+
+    // this is the runtime bottleneck: O(n^3 sqrt(m)) in this implementation
+    GomoryHu<ListGraph, ListGraph::EdgeMap<double> > cut_tree(*bi_support_graph,
+                                                              *bi_support_capacity);
+    cut_tree.run();
+
+    // 3. LOOK FOR VIOLATED BI FROM MIN-CUT VALUES AT EACH EDGE IN THE CUT TREE
+
+    ListGraph::Node dummy = bi_support_vertices.back();
+
+    // 3.1 TRAVERSE CUT TREE EDGES BY QUERYING THE PREDECESSOR OF EACH VERTEX (EXCEPT THE ROOT) 
+    for (long idx=0; idx<num_vertices+1; ++idx)
+    {
+        ListGraph::Node s = bi_support_vertices.at(idx);
+        ListGraph::Node t = cut_tree.predNode(s);
+        if(t != INVALID)   // not the cut tree root (n+1 vertices => n edges)
+        {
+            // 3.2 MINCUT INDUCED BY THIS EDGE OF THE CUT TREE MAY GIVE A VIOLATED
+            // BI IF ITS VALUE IS < 1 AND ONE OF THE CUTSETS IS OF ODD CARDINALITY 
+            if (cut_tree.predValue(s) < MSI_ONE)
+            {
+                // 3.2 SIDE 1: HANDLE INDUCED BY THE CUTSET CONTAINING S
+                bool cutset_with_s = true;
+                long cutset_size = 0;
+                vector<long> cutset_vertices = vector<long>();
+                vector<bool> cutset_mask = vector<bool>(num_vertices, false);
+
+                for(GomoryHu<ListGraph, ListGraph::EdgeMap<double> >::MinCutNodeIt it(cut_tree, s, t, cutset_with_s); it != INVALID; ++it)
+                {
+                    // ignore the dummy vertex
+                    long vertex_id = bi_support_graph->id(it);
+                    if (vertex_id != bi_support_graph->id(dummy))
+                    {
+                        ++cutset_size;
+                        cutset_vertices.push_back(vertex_id);
+
+                        // TO DO: remove this later if it proves safe to use vertex_id
+                        long original_index = (*bi_support_inverted_index)[it];
+                        cutset_mask.at(original_index) = true;
+
+                        if (original_index != vertex_id)
+                            cout << "NOTE TO SELF! original_index != vertex_id indeed possible" << endl;
+                    }
+                }
+
+                if (cutset_size % 2 == 1)
+                {
+                    long bi_rhs = (cutset_size - 1) / 2;
+
+                    // determine edges with both endpoints in the cutset and check for violation
+                    GRBLinExpr violated_constr = 0;
+                    double current_lhs = bi_handle_from_cutset(cutset_vertices, cutset_mask, violated_constr);
+
+                    if (current_lhs > bi_rhs)
+                    {
+                        cuts_lhs.push_back(violated_constr);
+                        cuts_rhs.push_back(bi_rhs);
+                    }
+
+                    #ifdef DEBUG_BI
+                        if (current_lhs > bi_rhs)
+                            cout << "### ADDED BI: (...) = " << current_lhs << " > " << bi_rhs << endl;
+                    #endif
+                }
+
+                // 3.2 SIDE 2: REPEAT FOR THE HANDLE INDUCED BY THE CUTSET CONTAINING T
+                cutset_with_s = false;
+                cutset_size = 0;
+                cutset_vertices.clear();
+                cutset_mask = vector<bool>(num_vertices, false);
+                for(GomoryHu<ListGraph, ListGraph::EdgeMap<double> >::MinCutNodeIt it(cut_tree, s, t, cutset_with_s); it != INVALID; ++it)
+                {
+                    // ignore the dummy vertex
+                    long vertex_id = bi_support_graph->id(it);
+                    if (vertex_id != bi_support_graph->id(dummy))
+                    {
+                        ++cutset_size;
+                        cutset_vertices.push_back(vertex_id);
+
+                        long original_index = (*bi_support_inverted_index)[it];
+                        cutset_mask.at(original_index) = true;
+
+                        if (original_index != vertex_id)
+                            cout << "NOTE TO SELF! original_index != vertex_id indeed possible" << endl;
+                    }
+                }
+
+                if (cutset_size % 2 == 1)
+                {
+                    long bi_rhs = (cutset_size - 1) / 2;
+
+                    // determine edges with both endpoints in the cutset and check for violation
+                    GRBLinExpr violated_constr = 0;
+                    double current_lhs = bi_handle_from_cutset(cutset_vertices, cutset_mask, violated_constr);
+
+                    if (current_lhs > bi_rhs)
+                    {
+                        cuts_lhs.push_back(violated_constr);
+                        cuts_rhs.push_back(bi_rhs);
+                    }
+
+                    #ifdef DEBUG_BI
+                        if (current_lhs > bi_rhs)
+                            cout << "### ADDED BI: (...) = " << current_lhs << " > " << bi_rhs << endl;
+                    #endif
+                }
+            }
+        }
+    }
+
+    delete bi_support_capacity;
 
     return (cuts_lhs.size() > 0);
 }
+
+double WCMCutGenerator::bi_handle_from_cutset(vector<long> &cutset_vertices,
+                                              vector<bool> &cutset_mask,
+                                              GRBLinExpr &constr)
+{
+    /***
+     * Determines the edges induced by a given cutset, and fills the constraint
+     * lhs with the corresponding x_vars. Returns the x_val in the current
+     * relaxation.
+     */
+
+    double current_lhs = 0.0;
+    long cutset_size = cutset_vertices.size();
+
+    // Choose faster option: m tests whether an edge is induced by the cutset
+    // vs. h(h-1)/2 adjacency tests within cutset vertices only (h = cutset_size)
+    if ( num_edges < cutset_size*(cutset_size-1)/2 )
+    {
+        for (long edge_idx = 0; edge_idx < num_edges; ++edge_idx)
+        {
+            long v1 = instance->graph->s.at(edge_idx);
+            if (cutset_mask.at(v1))
+            {
+                long v2 = instance->graph->t.at(edge_idx);
+                if (cutset_mask.at(v2))
+                {
+                    constr += (x_vars[edge_idx]);
+                    current_lhs += x_val[edge_idx];
+                }
+            }
+        }
+    }
+    else
+    {
+        for (long i = 0; i < cutset_size; ++i)
+        {
+            for (long j = i+1; j < cutset_size; ++j)
+            {
+                long v1 = cutset_vertices.at(i);
+                long v2 = cutset_vertices.at(j);
+                long edge_idx = instance->graph->index_matrix[v1][v2];
+                if (edge_idx >= 0)
+                {
+                    constr += (x_vars[edge_idx]);
+                    current_lhs += x_val[edge_idx];
+                }
+            }
+        }
+    }
+
+    return current_lhs;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 bool WCMCutGenerator::run_indegree_separation(int kind_of_cut)
 {
@@ -381,6 +618,8 @@ bool WCMCutGenerator::separate_indegree(vector<GRBLinExpr> &cuts_lhs,
 
     return (cuts_lhs.size() > 0);
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 bool WCMCutGenerator::run_minimal_separators_separation(int kind_of_cut)
 {

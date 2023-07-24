@@ -12,6 +12,9 @@
 #include <lemon/concepts/digraph.h>
 #include <lemon/smart_graph.h>
 #include <lemon/preflow.h>
+
+// using the Gomory-Hu cut tree in COIN-OR:LEMON (see: www.lemon.cs.elte.hu)
+#include <lemon/list_graph.h>
 #include <lemon/gomory_hu.h>
 using namespace lemon;
 
@@ -39,7 +42,7 @@ class WCMCutGenerator: public GRBCallback
 {
 public:
     WCMCutGenerator(GRBModel*, GRBVar*, GRBVar*, IO*);
-    virtual ~WCMCutGenerator() { }
+    virtual ~WCMCutGenerator();
 
 protected:
     friend class WCMModel;
@@ -62,6 +65,12 @@ protected:
     long blossom_counter;
     bool run_blossom_separation(int);
     bool separate_blossom(vector<GRBLinExpr> &, vector<long> &);
+    double inline bi_handle_from_cutset(vector<long> &, vector<bool> &, GRBLinExpr &);
+    ListGraph *bi_support_graph;
+    vector<ListGraph::Node> bi_support_vertices;
+    ListGraph::NodeMap<long> *bi_support_inverted_index;
+    vector<ListGraph::Edge> bi_support_edges;
+    ListGraph::EdgeMap<double> *bi_support_capacity;
 
     long indegree_counter;
     bool run_indegree_separation(int);

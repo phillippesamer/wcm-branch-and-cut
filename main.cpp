@@ -66,12 +66,11 @@ int main(int argc, char **argv)
 
     WCMModel *model = new WCMModel(instance);
 
-    /*
     model->solve_lp_relax(false);
     if (WRITE_LATEX_TABLE_ROW)
         instance->save_lpr_info(model->lp_bound, model->lp_runtime);
-    */
     
+    /*
     model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT);
     model->solve(true);
 
@@ -88,6 +87,7 @@ int main(int argc, char **argv)
 
         instance->write_summary_info(LATEX_TABLE_FILE_PATH);
     }
+    */
 
     delete model;
     delete instance;

@@ -2,9 +2,9 @@
 
 /// algorithm setup switches
 
-bool GRB_CUTS = true;            // gurobi (automatic) cuts on/off
-bool GRB_HEURISTICS = true;      // gurobi (automatic) heuristics on/off
-bool GRB_PREPROCESSING = true;   // gurobi (automatic) preprocessing on/off
+bool GRB_CUTS = false;            // gurobi (automatic) cuts on/off
+bool GRB_HEURISTICS = false;      // gurobi (automatic) heuristics on/off
+bool GRB_PREPROCESSING = false;   // gurobi (automatic) preprocessing on/off
 
 const double EPSILON_TOL = 1e-5;
 
@@ -64,6 +64,7 @@ void WCMModel::create_variables()
     }
 
     // binary vars y[u] = 1 iff vertex u is covered by the matching
+    // NB! y is just an auxiliary alias in this formulation; no need to force integrality
     y = new GRBVar[instance->graph->num_vertices];
     for (long u = 0; u < instance->graph->num_vertices; ++u)
     {
@@ -497,10 +498,8 @@ bool WCMModel::solve_lp_relax(bool logging)
 
         while (model_updated && model->get(GRB_IntAttr_Status) == GRB_OPTIMAL)
         {
-            #ifdef DEBUG_LPR
             cout << "LP relaxation pass #" << lp_passes << " (bound = "
                  << model->get(GRB_DoubleAttr_ObjVal) << ")" << endl;
-            #endif
 
             // cut generator object used only to find violated inequalities;
             // the callback in gurobi is not run in this context
@@ -559,17 +558,38 @@ bool WCMModel::solve_lp_relax(bool logging)
                 cout << solution_output.str() << endl;
             #endif
 
-            if (logging)
+            cout << "[LPR] Blossom inequalities added: "
+                 <<  cutgen->blossom_counter << endl;
+
+            cout << "[LPR] Minimal separator inequalities added: "
+                 <<  cutgen->minimal_separators_counter << endl;
+
+            cout << "[LPR] Indegree inequalities added: "
+                 << cutgen->indegree_counter << endl << endl;
+
+            long x_frac = 0;
+            for (long e = 0; e < instance->graph->num_edges; ++e)
             {
-                cout << "Blossom inequalities added: "
-                     <<  cutgen->blossom_counter << endl;
-
-                cout << "Minimal separator inequalities added: "
-                     <<  cutgen->minimal_separators_counter << endl;
-
-                cout << "Indegree inequalities added: "
-                     << cutgen->indegree_counter << endl;
+                double x_e = x[e].get(GRB_DoubleAttr_X);
+                if (x_e > EPSILON_TOL && x_e < 1-EPSILON_TOL)
+                    ++x_frac;
             }
+
+            long y_frac = 0;
+            for (long u = 0; u < instance->graph->num_vertices; ++u)
+            {
+                double y_u = y[u].get(GRB_DoubleAttr_X);
+                if (y_u > EPSILON_TOL && y_u < 1-EPSILON_TOL)
+                    ++y_u;
+            }
+
+            if (x_frac > 0 || y_frac > 0)
+            {
+                cout << "[LPR] " << x_frac << " fractional x variables" << endl;
+                cout << "[LPR] " << y_frac << " fractional y variables" << endl;
+            }
+            else
+                cout << "[LPR] integer feasible solution" << endl;
 
             // restore IP model
             model->set(GRB_IntParam_Cuts, -1);
