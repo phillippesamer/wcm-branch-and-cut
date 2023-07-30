@@ -2,9 +2,9 @@
 
 /// algorithm setup switches
 
-bool GRB_CUTS = false;            // gurobi (automatic) cuts on/off
-bool GRB_HEURISTICS = false;      // gurobi (automatic) heuristics on/off
-bool GRB_PREPROCESSING = false;   // gurobi (automatic) preprocessing on/off
+bool GRB_CUTS = true;            // gurobi (automatic) cuts on/off
+bool GRB_HEURISTICS = true;      // gurobi (automatic) heuristics on/off
+bool GRB_PREPROCESSING = true;   // gurobi (automatic) preprocessing on/off
 
 const double EPSILON_TOL = 1e-5;
 
@@ -397,8 +397,8 @@ int WCMModel::save_optimization_status()
             this->solution_weight = numeric_limits<double>::max();
 
         cout << "Time limit exceeded (" << solution_runtime << ")" << endl;
-        cout << "Dual bound " << this->solution_dualbound 
-             << ", primal bound " << this->solution_weight 
+        cout << "Primal bound " << this->solution_weight 
+             << ", dual bound " << this->solution_dualbound 
              << " (MIP gap " << 100*model->get(GRB_DoubleAttr_MIPGap) << "%)" 
              << endl;
 

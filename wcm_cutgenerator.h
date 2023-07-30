@@ -64,11 +64,17 @@ protected:
 
     long blossom_counter;
     bool run_blossom_separation(int);
-    bool separate_blossom(vector<GRBLinExpr> &, vector<long> &);
-    double inline bi_handle_from_cutset(vector<long> &, vector<bool> &, GRBLinExpr &);
+    bool separate_blossom_exactly(vector<GRBLinExpr> &, vector<long> &);
+    bool separate_blossom_heuristically(vector<GRBLinExpr> &, vector<long> &);
+    double inline bi_lhs_from_handle(vector<long> &, vector<bool> &, GRBLinExpr &);
+    void inline get_fractional_info(vector<bool> &, vector<bool> &);
+    void inline dfs_from_frac_x_only(vector<bool> &,
+                                 vector<bool> &,
+                                 long,
+                                 vector<long> &,
+                                 vector<bool> &);
     ListGraph *bi_support_graph;
     vector<ListGraph::Node> bi_support_vertices;
-    ListGraph::NodeMap<long> *bi_support_inverted_index;
     vector<ListGraph::Edge> bi_support_edges;
     ListGraph::EdgeMap<double> *bi_support_capacity;
 

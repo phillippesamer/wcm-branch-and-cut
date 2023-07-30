@@ -52,3 +52,8 @@ Edit the Makefile initial definition of variable `GRB_PATH` to reflect the root 
 make
 ./wcm [input file path]
 ```
+
+The input parser reads `.gcc` (_graphs with conflict constraints_) and `.stp` (DIMACS _steiner tree problem_) formats automatically. See the five instances in `input/ex*` files for small examples. **N.B.** When using an `.stp` instance with edge weights (_e.g._ in the generalized maximum-weight connected subgraph benchmark), run the executable with an arbitrary additional argument:
+```
+./wcm [input file path] -e
+```

@@ -2,15 +2,16 @@
 
 /// algorithm setup switches
 
-bool SEPARATE_MSI = false;              // MSI = minimal separator inequalities
+bool SEPARATE_MSI = true;              // MSI = minimal separator inequalities
 bool SEPARATE_INDEGREE = false;
 bool SEPARATE_BLOSSOM = true;
 
-bool MSI_FROM_INTEGER_POINTS_ONLY = false; // weaker but faster node relaxation
+bool MSI_FROM_INTEGER_POINTS_ONLY = false;  // weaker but faster node relaxation
 bool MSI_STRATEGY_FIRST_CUT = true;    // only used when separating fract.points
 bool MSI_ONLY_IF_NO_INDEGREE = false;  // only used when separating fract.points
 
 bool BLOSSOM_AT_ROOT_ONLY = false;
+bool BLOSSOM_HEURISTIC_SEPARATION = true;
 
 // clean any bits beyond the corresponding precision to avoid numerical errors?
 // (at most 14, since gurobi does not support long double yet...)
@@ -112,7 +113,6 @@ WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar *x_vars, GRBVar *y_vars
 
     this->bi_support_graph = new ListGraph();
     this->bi_support_vertices.reserve(this->num_vertices + 1);
-    this->bi_support_inverted_index = new ListGraph::NodeMap<long>(*bi_support_graph);
     this->bi_support_edges.reserve(this->num_edges + this->num_vertices);
     this->bi_support_capacity = NULL;
 
@@ -120,10 +120,7 @@ WCMCutGenerator::WCMCutGenerator(GRBModel *model, GRBVar *x_vars, GRBVar *y_vars
     {
         // n vertices from instance graph, plus an artificial/dummy universal one
         for (long i=0; i < num_vertices+1; ++i)
-        {
             bi_support_vertices.push_back(bi_support_graph->addNode());
-            (*bi_support_inverted_index)[bi_support_vertices.back()] = i;
-        }
 
         // m edges as in the instance graph, plus one from dummy to each vertex
         for (long idx=0; idx<num_edges; ++idx)
@@ -150,7 +147,6 @@ WCMCutGenerator::~WCMCutGenerator()
 {
     this->bi_support_vertices.clear();
     this->bi_support_edges.clear();
-    delete bi_support_inverted_index;
     delete bi_support_graph;
 }
 
@@ -320,11 +316,12 @@ bool WCMCutGenerator::run_blossom_separation(int kind_of_cut)
     vector<GRBLinExpr> cuts_lhs = vector<GRBLinExpr>();
     vector<long> cuts_rhs = vector<long>();
 
-    /* run classical separation algorithm from Padberg & Rao (1982) - still the
-     * most efficient for the uncapacitated case cf. "Odd minimum cut sets and
-     * b-matchings revisited", 2008, by [Letchford, Reinelt, Theis]
-     */
-    model_updated = separate_blossom(cuts_lhs, cuts_rhs);
+    if (BLOSSOM_HEURISTIC_SEPARATION)
+        // heuristic separation = attempt to find a violated BI quickly, but might fail - runtime in O(n + m)
+        model_updated = separate_blossom_heuristically(cuts_lhs, cuts_rhs);
+    else
+        // exact separation = either find a violated BI, or decide that none exists - runtime in O(n^3 \sqrt(m))
+        model_updated = separate_blossom_exactly(cuts_lhs, cuts_rhs);
 
     if (model_updated)
     {
@@ -347,10 +344,14 @@ bool WCMCutGenerator::run_blossom_separation(int kind_of_cut)
     return model_updated;
 }
 
-bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
-                                       vector<long> &cuts_rhs)
+bool WCMCutGenerator::separate_blossom_exactly(vector<GRBLinExpr> &cuts_lhs,
+                                               vector<long> &cuts_rhs)
 {
-    /// Solve the separation problem for blossom inequalities
+    /***
+     * Run classical separation algorithm from Padberg & Rao (1982) - still the
+     * most efficient for the uncapacitated case cf. "Odd minimum cut sets and
+     * b-matchings revisited", 2008, by [Letchford, Reinelt, Theis].
+     */
 
     // 1. DETERMINE UPDATED EDGE CAPACITIES FROM THE CURRENT RELAXATION
 
@@ -410,13 +411,7 @@ bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
                     {
                         ++cutset_size;
                         cutset_vertices.push_back(vertex_id);
-
-                        // TO DO: remove this later if it proves safe to use vertex_id
-                        long original_index = (*bi_support_inverted_index)[it];
-                        cutset_mask.at(original_index) = true;
-
-                        if (original_index != vertex_id)
-                            cout << "NOTE TO SELF! original_index != vertex_id indeed possible" << endl;
+                        cutset_mask.at(vertex_id) = true;
                     }
                 }
 
@@ -426,7 +421,7 @@ bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
 
                     // determine edges with both endpoints in the cutset and check for violation
                     GRBLinExpr violated_constr = 0;
-                    double current_lhs = bi_handle_from_cutset(cutset_vertices, cutset_mask, violated_constr);
+                    double current_lhs = bi_lhs_from_handle(cutset_vertices, cutset_mask, violated_constr);
 
                     if (current_lhs > bi_rhs)
                     {
@@ -453,12 +448,7 @@ bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
                     {
                         ++cutset_size;
                         cutset_vertices.push_back(vertex_id);
-
-                        long original_index = (*bi_support_inverted_index)[it];
-                        cutset_mask.at(original_index) = true;
-
-                        if (original_index != vertex_id)
-                            cout << "NOTE TO SELF! original_index != vertex_id indeed possible" << endl;
+                        cutset_mask.at(vertex_id) = true;
                     }
                 }
 
@@ -468,7 +458,7 @@ bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
 
                     // determine edges with both endpoints in the cutset and check for violation
                     GRBLinExpr violated_constr = 0;
-                    double current_lhs = bi_handle_from_cutset(cutset_vertices, cutset_mask, violated_constr);
+                    double current_lhs = bi_lhs_from_handle(cutset_vertices, cutset_mask, violated_constr);
 
                     if (current_lhs > bi_rhs)
                     {
@@ -490,30 +480,30 @@ bool WCMCutGenerator::separate_blossom(vector<GRBLinExpr> &cuts_lhs,
     return (cuts_lhs.size() > 0);
 }
 
-double WCMCutGenerator::bi_handle_from_cutset(vector<long> &cutset_vertices,
-                                              vector<bool> &cutset_mask,
-                                              GRBLinExpr &constr)
+double WCMCutGenerator::bi_lhs_from_handle(vector<long> &handle_vertices,
+                                           vector<bool> &handle_mask,
+                                           GRBLinExpr &constr)
 {
     /***
-     * Determines the edges induced by a given cutset, and fills the constraint
+     * Determines the edges induced by a given handle, and fills the constraint
      * lhs with the corresponding x_vars. Returns the x_val in the current
      * relaxation.
      */
 
     double current_lhs = 0.0;
-    long cutset_size = cutset_vertices.size();
+    long handle_size = handle_vertices.size();
 
-    // Choose faster option: m tests whether an edge is induced by the cutset
-    // vs. h(h-1)/2 adjacency tests within cutset vertices only (h = cutset_size)
-    if ( num_edges < cutset_size*(cutset_size-1)/2 )
+    // Choose faster option: m tests whether an edge is induced by the handle
+    // vs. h(h-1)/2 adjacency tests within handle vertices only (h = handle_size)
+    if ( num_edges < handle_size*(handle_size-1)/2 )
     {
         for (long edge_idx = 0; edge_idx < num_edges; ++edge_idx)
         {
             long v1 = instance->graph->s.at(edge_idx);
-            if (cutset_mask.at(v1))
+            if (handle_mask.at(v1))
             {
                 long v2 = instance->graph->t.at(edge_idx);
-                if (cutset_mask.at(v2))
+                if (handle_mask.at(v2))
                 {
                     constr += (x_vars[edge_idx]);
                     current_lhs += x_val[edge_idx];
@@ -523,12 +513,12 @@ double WCMCutGenerator::bi_handle_from_cutset(vector<long> &cutset_vertices,
     }
     else
     {
-        for (long i = 0; i < cutset_size; ++i)
+        for (long i = 0; i < handle_size; ++i)
         {
-            for (long j = i+1; j < cutset_size; ++j)
+            for (long j = i+1; j < handle_size; ++j)
             {
-                long v1 = cutset_vertices.at(i);
-                long v2 = cutset_vertices.at(j);
+                long v1 = handle_vertices.at(i);
+                long v2 = handle_vertices.at(j);
                 long edge_idx = instance->graph->index_matrix[v1][v2];
                 if (edge_idx >= 0)
                 {
@@ -540,6 +530,113 @@ double WCMCutGenerator::bi_handle_from_cutset(vector<long> &cutset_vertices,
     }
 
     return current_lhs;
+}
+
+bool WCMCutGenerator::separate_blossom_heuristically(vector<GRBLinExpr> &cuts_lhs,
+                                                     vector<long> &cuts_rhs)
+{
+    /***
+     * Simple heuristic to try to find a violated BI in linear time:
+     * 1. Let H be the support graph induced only from vars in (0,1)
+     * 2. Let H_i for i in [p] denote the connected components of H
+     * 3. For i in [p], if |V(H_i)| is odd, inspect the corresponding BI for violation
+     */
+
+    // 1. DETERMINE VERTICES AND EDGES INDUCED BY FRACTIONAL x* ONLY
+    
+    vector<bool> vertex_mask = vector<bool>(num_vertices, false);
+    vector<bool> edge_mask = vector<bool>(num_edges, false);
+    get_fractional_info(vertex_mask, edge_mask);
+
+    // 2. DFS TO CHECK CONNECTED COMPONENTS INDUCED BY FRACTIONAL-VALUED EDGES
+
+    vector<bool> seen = vector<bool>(num_vertices, false);
+    for (long source = 0; source < num_vertices; ++source)
+    {
+        if (vertex_mask.at(source) && !seen.at(source))
+        {
+            vector<long> component_vertices = vector<long>();
+            vector<bool> component_mask = vector<bool>(num_vertices, false);
+
+            dfs_from_frac_x_only(edge_mask,
+                                 seen,
+                                 source,   // only arg. passed by value
+                                 component_vertices,
+                                 component_mask);
+
+            long size = component_vertices.size();
+            double bi_rhs = (size - 1) / 2;
+
+            if (size % 2 == 1)
+            {
+                // 3. CHECK IF CURRENT ODD COMPONENT AS HANDLE GIVES A BI VIOLATED AT x*
+                GRBLinExpr violated_constr = 0;
+
+                // besides checking violation, lift inequality to include x_vars for induced edges at 0
+                double current_lhs = bi_lhs_from_handle(component_vertices, component_mask, violated_constr);
+
+                if (current_lhs - bi_rhs > MSI_ZERO)
+                {
+                    cuts_lhs.push_back(violated_constr);
+                    cuts_rhs.push_back(bi_rhs);
+
+                    #ifdef DEBUG_BI
+                        cout << "### ADDED BI: (...) = " << current_lhs << " > " << bi_rhs << endl;
+                    #endif
+                }
+            }
+        }
+    }
+
+    return (cuts_lhs.size() > 0);
+}
+
+void inline WCMCutGenerator::get_fractional_info(vector<bool> &vertex_mask,
+                                                 vector<bool> &edge_mask)
+{
+    /// determine support graph "mask" induced by fractional x vars only
+
+    for (long idx=0; idx < num_edges; ++idx)
+    {
+        if (x_val[idx] > MSI_ZERO && x_val[idx] < MSI_ONE)
+        {
+            edge_mask.at(idx) = true;
+
+            long v1 = instance->graph->s.at(idx);
+            long v2 = instance->graph->t.at(idx);
+
+            vertex_mask.at(v1) = true;
+            vertex_mask.at(v2) = true;
+        }
+    }
+}
+
+void inline WCMCutGenerator::dfs_from_frac_x_only(vector<bool> &edge_mask,
+                                                  vector<bool> &seen,
+                                                  long u,   // NB! only arg. passed by value
+                                                  vector<long> &component_vertices,
+                                                  vector<bool> &component_mask)
+{
+    /// auxiliary dfs over subgraph induced by fractional x vars
+    seen.at(u) = true;
+    component_vertices.push_back(u);
+    component_mask.at(u) = true;
+
+    for (list<long>::iterator it = instance->graph->adj_list.at(u).begin();
+        it != instance->graph->adj_list.at(u).end(); ++it)
+    {
+        long v = *it;
+        long edge_idx = instance->graph->index_matrix[u][v];
+
+        if (edge_mask.at(edge_idx) && !seen.at(v))
+        {
+            dfs_from_frac_x_only(edge_mask,
+                                 seen,
+                                 v,   // NB! only arg. passed by value
+                                 component_vertices,
+                                 component_mask);
+         }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
