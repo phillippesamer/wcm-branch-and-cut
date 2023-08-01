@@ -314,7 +314,7 @@ void IO::write_summary_info(string output_file_path)
     if (xpfile.is_open())
     {
         xpfile << summary_info.str();
-        xpfile << endl;
+        //xpfile << endl;
         xpfile.close();
     }
     else

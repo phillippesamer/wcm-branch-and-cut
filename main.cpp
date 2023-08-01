@@ -19,10 +19,14 @@
 using namespace std;
 
 // execution switches
-double RUN_WCM_WITH_TIME_LIMIT = 1800;
+double RUN_WCM_WITH_TIME_LIMIT = 3600.0;
+
+bool DEDICATED_LP_RELAXATION = true;
+double DEDICATED_LPR_TIME_LIMIT = 300;
+bool DEDICATED_LPR_GRB_CUTS_OFF = false;
 
 bool WRITE_LATEX_TABLE_ROW = true;
-string LATEX_TABLE_FILE_PATH = string("xp7.dat");
+string LATEX_TABLE_FILE_PATH = string("xp13.dat");
 
 int main(int argc, char **argv)
 {
@@ -66,13 +70,17 @@ int main(int argc, char **argv)
 
     WCMModel *model = new WCMModel(instance);
 
-    /*
-    model->solve_lp_relax(false);
-    if (WRITE_LATEX_TABLE_ROW)
-        instance->save_lpr_info(model->lp_bound, model->lp_runtime);
-    */
+    if (DEDICATED_LP_RELAXATION)
+    {
+        model->solve_lp_relax(false,
+                              DEDICATED_LPR_TIME_LIMIT,
+                              DEDICATED_LPR_GRB_CUTS_OFF);
+
+        if (WRITE_LATEX_TABLE_ROW)
+            instance->save_lpr_info(model->lp_bound, model->lp_runtime);
+    }
     
-    model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT);
+    model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT - model->lp_runtime);
     model->solve(true);
 
     if (WRITE_LATEX_TABLE_ROW)

@@ -2,9 +2,11 @@
 
 /// algorithm setup switches
 
-bool GRB_CUTS = true;            // gurobi (automatic) cuts on/off
-bool GRB_HEURISTICS = true;      // gurobi (automatic) heuristics on/off
-bool GRB_PREPROCESSING = true;   // gurobi (automatic) preprocessing on/off
+bool GRB_CUTS = true;             // gurobi (automatic) cuts on/off
+bool GRB_HEURISTICS = true;       // gurobi (automatic) heuristics on/off
+bool GRB_PREPROCESSING = true;    // gurobi (automatic) preprocessing on/off
+
+bool GRB_HEURISTICS_FOCUS = true; // extra focus on gurobi heuristics
 
 const double EPSILON_TOL = 1e-5;
 
@@ -142,6 +144,14 @@ int WCMModel::solve(bool logging)
 
         if (!GRB_HEURISTICS)
             model->set(GRB_DoubleParam_Heuristics, 0);
+        else
+        {
+            if (GRB_HEURISTICS_FOCUS)
+            {
+                model->set(GRB_IntParam_MIPFocus, 1);
+                model->set(GRB_DoubleParam_Heuristics, 0.2);
+            }
+        }
 
         if (!GRB_PREPROCESSING)
         {
@@ -457,7 +467,7 @@ void WCMModel::fill_solution_vectors()
     #endif
 }
 
-bool WCMModel::solve_lp_relax(bool logging)
+bool WCMModel::solve_lp_relax(bool logging, double time_limit, bool grb_cuts_off)
 {
     /***
      * Determine the LP relaxation bound of the full IP formulation, including
@@ -467,8 +477,8 @@ bool WCMModel::solve_lp_relax(bool logging)
 
     try
     {
-        // turn off all gurobi cut generators
-        model->set(GRB_IntParam_Cuts, 0);
+        if (grb_cuts_off)
+            model->set(GRB_IntParam_Cuts, 0);
 
         if (logging == true)
             model->set(GRB_IntParam_OutputFlag, 1);
@@ -493,32 +503,42 @@ bool WCMModel::solve_lp_relax(bool logging)
 
         // solve LP to optimality; then iterate separation and reoptimization
         model->optimize();
-        bool model_updated = true;
+        bool updated = true;
         this->lp_passes = 1;
+        this->lp_runtime = model->get(GRB_DoubleAttr_Runtime);
 
-        while (model_updated && model->get(GRB_IntAttr_Status) == GRB_OPTIMAL)
+        while (updated && model->get(GRB_IntAttr_Status) == GRB_OPTIMAL)
         {
             cout << "LP relaxation pass #" << lp_passes << " (bound = "
-                 << model->get(GRB_DoubleAttr_ObjVal) << ")" << endl;
+                 << model->get(GRB_DoubleAttr_ObjVal) << ", runtime: "
+                 << this->lp_runtime << ")" << endl;
 
             // cut generator object used only to find violated inequalities;
             // the callback in gurobi is not run in this context
-            model_updated = cutgen->separate_lpr();
+            updated = cutgen->separate_lpr();
 
             // reoptimize
-            if (model_updated)
+            if (updated)
             {
                 model->optimize();  // includes processing pending modifications
                 this->lp_passes++;
+
+                // time limit bookkeeping
+                gettimeofday(clock_stop, 0);
+                unsigned long clock_time
+                    = 1.e6 * (clock_stop->tv_sec - clock_start->tv_sec) +
+                             (clock_stop->tv_usec - clock_start->tv_usec);
+
+                this->lp_runtime = ((double)clock_time / (double)1.e6);
+
+                if (this->lp_runtime > time_limit)
+                {
+                    cout << endl << "[LPR] Time limit exceeded" << endl;
+                    updated = false;
+                }
             }
         }
 
-        // LP relaxation time
-        gettimeofday(clock_stop, 0);
-        unsigned long clock_time
-            = 1.e6 * (clock_stop->tv_sec - clock_start->tv_sec) +
-                     (clock_stop->tv_usec - clock_start->tv_usec);
-        this->lp_runtime = ((double)clock_time / (double)1.e6);
         free(clock_start);
         free(clock_stop);
 

@@ -3,15 +3,17 @@
 /// algorithm setup switches
 
 bool SEPARATE_MSI = true;              // MSI = minimal separator inequalities
-bool SEPARATE_INDEGREE = false;
 bool SEPARATE_BLOSSOM = true;
+bool SEPARATE_INDEGREE = true;
 
-bool MSI_FROM_INTEGER_POINTS_ONLY = false;  // weaker but faster node relaxation
-bool MSI_STRATEGY_FIRST_CUT = true;    // only used when separating fract.points
-bool MSI_ONLY_IF_NO_INDEGREE = false;  // only used when separating fract.points
+bool MSI_STRATEGY_FIRST_CUT_BELOW_ROOT = true;
+bool MSI_FROM_INTEGER_POINTS_ONLY = false;
 
 bool BLOSSOM_AT_ROOT_ONLY = false;
 bool BLOSSOM_HEURISTIC_SEPARATION = true;
+
+bool INDEGREE_AT_ROOT_ONLY = true;
+bool MSI_ONLY_IF_NO_INDEGREE = false;
 
 // clean any bits beyond the corresponding precision to avoid numerical errors?
 // (at most 14, since gurobi does not support long double yet...)
@@ -186,7 +188,10 @@ void WCMCutGenerator::callback()
 
             bool separated = false;
             if (SEPARATE_INDEGREE)
-                separated = run_indegree_separation(ADD_USER_CUTS);
+            {
+                if (at_root_relaxation || !INDEGREE_AT_ROOT_ONLY)
+                    separated = run_indegree_separation(ADD_USER_CUTS);
+            }
 
             if (SEPARATE_MSI)
             {
@@ -240,6 +245,9 @@ bool WCMCutGenerator::separate_lpr()
 {
     /// Interface to be used when solving the LP relaxation only.
 
+    // avoid cut policy distinguishing root node relaxation from others
+    this->at_root_relaxation = false;
+
     try
     {
         // retrieve relaxation solution
@@ -261,7 +269,7 @@ bool WCMCutGenerator::separate_lpr()
         if (SEPARATE_BLOSSOM && !x_integral)
             blossom_cut = run_blossom_separation(ADD_STD_CNTRS);
 
-        if (SEPARATE_INDEGREE)
+        if (SEPARATE_INDEGREE && !INDEGREE_AT_ROOT_ONLY)
             indegree_cut = run_indegree_separation(ADD_STD_CNTRS);
 
         if (SEPARATE_MSI)
@@ -275,10 +283,24 @@ bool WCMCutGenerator::separate_lpr()
             }
         }
 
+        bool separated = (blossom_cut || indegree_cut || msi_cut);
+
+        // last resort: attempt exact BI separation (and indegree..)
+        if (!separated && !x_integral && BLOSSOM_HEURISTIC_SEPARATION)
+        {
+            BLOSSOM_HEURISTIC_SEPARATION = false;
+            separated = run_blossom_separation(ADD_STD_CNTRS);
+            BLOSSOM_HEURISTIC_SEPARATION = true;
+
+            if (!separated && !y_integral)
+                separated = run_indegree_separation(ADD_STD_CNTRS);
+        }
+
+        // clean up
         delete[] x_val;
         delete[] y_val;
 
-        return (blossom_cut || indegree_cut || msi_cut);
+        return separated;
     }
     catch (GRBException e)
     {
@@ -1185,7 +1207,7 @@ bool WCMCutGenerator::separate_minimal_separators_std(vector<GRBLinExpr> &cuts_l
     long num_trials = 0;
     while (num_trials < num_vertices && !done)
     {
-        // "cycling" through the initial source vertex tried (only relevant with MSI_STRATEGY_FIRST_CUT)
+        // "cycling" through the initial source vertex tried (only relevant with MSI_STRATEGY_FIRST_CUT_BELOW_ROOT)
         long s = this->msi_next_source;
         long t = s+1;
         while (t < num_vertices && !done)
@@ -1320,7 +1342,7 @@ bool WCMCutGenerator::separate_minimal_separators_std(vector<GRBLinExpr> &cuts_l
                         cout << left;
                     #endif
 
-                    if (MSI_STRATEGY_FIRST_CUT && !at_root_relaxation)
+                    if (MSI_STRATEGY_FIRST_CUT_BELOW_ROOT && !at_root_relaxation)
                         done = true;
                 }
             }

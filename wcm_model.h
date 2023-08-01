@@ -41,7 +41,7 @@ public:
     ModelStatus solution_status;
     double solution_runtime;
 
-    bool solve_lp_relax(bool);
+    bool solve_lp_relax(bool, double, bool);
     double lp_bound;
     double lp_runtime;
     long lp_passes;
