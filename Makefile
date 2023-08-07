@@ -18,11 +18,11 @@ else
     endif
 endif
 
-CC          = g++ -Wall -Wextra -O3 -m64
+CC             = g++ -Wall -Wextra -O3 -m64
 
-FILES_CC    = graph.cpp io.cpp wcm_model.cpp wcm_cutgenerator.cpp main.cpp
+FILES_CC       = graph.cpp io.cpp wcm_model.cpp wcm_cutgenerator.cpp wcm_compact.cpp main.cpp
 
-BINARY      = wcm
+BINARY         = wcm
 
 all: clean compile
 

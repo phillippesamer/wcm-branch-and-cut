@@ -11,6 +11,7 @@
 
 #include "io.h"
 #include "wcm_model.h"
+#include "wcm_compact.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -19,18 +20,20 @@
 using namespace std;
 
 // execution switches
+bool SEPARATORS_BASED_FORMULATION = false;
 double RUN_WCM_WITH_TIME_LIMIT = 3600.0;
 
+bool WRITE_LATEX_TABLE_ROW = true;
+string LATEX_TABLE_FILE_PATH = string("xp14.dat");
+
+// switches concerning the exponential formulation only
 bool DEDICATED_LP_RELAXATION = true;
 double DEDICATED_LPR_TIME_LIMIT = 300;
 bool DEDICATED_LPR_GRB_CUTS_OFF = false;
 
-bool WRITE_LATEX_TABLE_ROW = true;
-string LATEX_TABLE_FILE_PATH = string("xp13.dat");
-
 int main(int argc, char **argv)
 {
-    // 0. PARSE INPUT FILE
+    // 1. PARSE INPUT FILE
 
     IO* instance = new IO();
 
@@ -66,38 +69,62 @@ int main(int argc, char **argv)
     if (WRITE_LATEX_TABLE_ROW)
         instance->save_instance_info();
 
-    // 1. BUILD AND SOLVE THE INTEGER PROGRAM
-
-    WCMModel *model = new WCMModel(instance);
-
-    if (DEDICATED_LP_RELAXATION)
+    if (SEPARATORS_BASED_FORMULATION)
     {
-        model->solve_lp_relax(false,
-                              DEDICATED_LPR_TIME_LIMIT,
-                              DEDICATED_LPR_GRB_CUTS_OFF);
+        // 2.A INTEGER PROGRAM CORRESPONDING TO THE SEPARATORS-BASED FORMULATION
+
+        WCMModel *model = new WCMModel(instance);
+
+        if (DEDICATED_LP_RELAXATION)
+        {
+            model->solve_lp_relax(false,
+                                  DEDICATED_LPR_TIME_LIMIT,
+                                  DEDICATED_LPR_GRB_CUTS_OFF);
+
+            if (WRITE_LATEX_TABLE_ROW)
+                instance->save_lpr_info(model->lp_bound, model->lp_runtime);
+        }
+        
+        model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT - model->lp_runtime);
+        model->solve(true);
 
         if (WRITE_LATEX_TABLE_ROW)
-            instance->save_lpr_info(model->lp_bound, model->lp_runtime);
-    }
-    
-    model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT - model->lp_runtime);
-    model->solve(true);
+        {
+            instance->save_bc_info(model->solution_weight,
+                                   model->solution_dualbound,
+                                   model->get_mip_gap(),
+                                   model->get_mip_runtime(),
+                                   model->get_mip_num_nodes(),
+                                   model->get_mip_blossom_counter(),
+                                   model->get_mip_msi_counter(),
+                                   model->get_mip_indegree_counter());
+            instance->write_summary_info(LATEX_TABLE_FILE_PATH);
+        }
 
-    if (WRITE_LATEX_TABLE_ROW)
+        delete model;
+    }
+    else
     {
-        instance->save_ip_info(model->solution_weight,
-                               model->solution_dualbound,
-                               model->get_mip_gap(),
-                               model->get_mip_runtime(),
-                               model->get_mip_num_nodes(),
-                               model->get_mip_blossom_counter(),
-                               model->get_mip_msi_counter(),
-                               model->get_mip_indegree_counter());
+        // 2.B INTEGER PROGRAM CORRESPONDING TO THE COMPACT, ARC-FLOW FORMULATION
 
-        instance->write_summary_info(LATEX_TABLE_FILE_PATH);
+        CompactWCMModel *model = new CompactWCMModel(instance);
+        
+        model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT);
+        model->solve(true);
+
+        if (WRITE_LATEX_TABLE_ROW)
+        {
+            instance->save_compact_info(model->solution_weight,
+                                        model->solution_dualbound,
+                                        model->get_mip_gap(),
+                                        model->get_mip_runtime(),
+                                        model->get_mip_num_nodes());
+            instance->write_summary_info(LATEX_TABLE_FILE_PATH);
+        }
+
+        delete model;
     }
 
-    delete model;
     delete instance;
     return 0;
 }

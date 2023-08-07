@@ -12,6 +12,8 @@
 
 using namespace std;
 
+enum ModelStatus {AT_OPTIMUM, STATUS_UNKNOWN};
+
 /***
  * \file io.h
  * 
@@ -34,7 +36,8 @@ public:
 
     void save_instance_info();
     void save_lpr_info(double, double);
-    void save_ip_info(double, double, double, double, long, long, long, long);
+    void save_bc_info(double, double, double, double, long, long, long, long);
+    void save_compact_info(double, double, double, double, long);
     void write_summary_info(string);
 
     // instance data
@@ -42,6 +45,7 @@ public:
     string instance_id_trimmed;
 
 private:
+    friend class CompactWCMModel;
     friend class WCMModel;
     friend class WCMCutGenerator;
 

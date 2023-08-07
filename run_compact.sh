@@ -221,82 +221,17 @@ instances_dimacs_gmwcs_gam=(
 # xp14:
 
 idx=1
-for entry in "${instances_dimacs_mwcs_actmod[@]}";
+for entry in "${instances_dimacs_gmwcs_gam[@]}";
 do
     timestamp=$(date)
     $(echo "[$timestamp]  $entry" >> "$entry""_xp14.out")
-    echo "[$timestamp] $idx/${#instances_dimacs_mwcs_actmod[@]}:  $entry"
+    echo "[$timestamp] $idx/${#instances_dimacs_gmwcs_gam[@]}:  $entry"
 
     output=$(./wcm  $entry  >> "$entry""_xp14.out" 2>&1)
     echo "$output"
 
     timestamp=$(date)
     $(echo -e "[$timestamp]  done\n" >> "$entry""_xp14.out")
-
-    # adding number of cuts from the strengthened LP relaxation to those reported by gurobi
-    grep '\[LPR\] Blossom inequalities added: '            "$entry""_xp14.out"  >>tmp_log_lpr_b.txt 
-    grep '\[LPR\] Minimal separator inequalities added: '  "$entry""_xp14.out"  >>tmp_log_lpr_m.txt
-    grep '\[LPR\] Indegree inequalities added: '           "$entry""_xp14.out"  >>tmp_log_lpr_i.txt
-    sed -i 's/\[LPR\] Blossom inequalities added: //g' tmp_log_lpr_b.txt
-    sed -i 's/\[LPR\] Minimal separator inequalities added: //g' tmp_log_lpr_m.txt
-    sed -i 's/\[LPR\] Indegree inequalities added: //g' tmp_log_lpr_i.txt
-    paste tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt | awk '{print $1 + $2 + $3}' >>tmp_log_lpr.txt
-    rm tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt
-
-    # get the number of cuts shown in the final statistics (cuts actually applied to improve the dual bound)
-    grep 'User: ' "$entry""_xp14.out" >>tmp_log_user.txt || echo "  User: 0" >>tmp_log_user.txt
-    grep 'Lazy ' "$entry""_xp14.out" >>tmp_log_lazy.txt || echo "  Lazy constraints: 0" >>tmp_log_lazy.txt
-    sed -i 's/  User: //g' tmp_log_user.txt
-    sed -i 's/  Lazy constraints: //g' tmp_log_lazy.txt
-
-    # if not running/adding cuts from strengthened LPR above, just count user cuts + lazy constraints
-    #paste tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % "$1 + $2}' >>xp14.dat
-    #rm tmp_log_user.txt tmp_log_lazy.txt
-
-    # otherwise, saving cut count during LPR and user+lazy
-    paste tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % " $1 " + " $2 + $3}' >>xp14.dat
-    rm tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt
-
-    ((++idx))
-done
-
-
-idx=1
-for entry in "${instances_dimacs_mwcs_gam[@]}";
-do
-    timestamp=$(date)
-    $(echo "[$timestamp]  $entry" >> "$entry""_xp14.out")
-    echo "[$timestamp] $idx/${#instances_dimacs_mwcs_gam[@]}:  $entry"
-
-    output=$(./wcm  $entry  >> "$entry""_xp14.out" 2>&1)
-    echo "$output"
-
-    timestamp=$(date)
-    $(echo -e "[$timestamp]  done\n" >> "$entry""_xp14.out")
-
-    # adding number of cuts from the strengthened LP relaxation to those reported by gurobi
-    grep '\[LPR\] Blossom inequalities added: '            "$entry""_xp14.out"  >>tmp_log_lpr_b.txt 
-    grep '\[LPR\] Minimal separator inequalities added: '  "$entry""_xp14.out"  >>tmp_log_lpr_m.txt
-    grep '\[LPR\] Indegree inequalities added: '           "$entry""_xp14.out"  >>tmp_log_lpr_i.txt
-    sed -i 's/\[LPR\] Blossom inequalities added: //g' tmp_log_lpr_b.txt
-    sed -i 's/\[LPR\] Minimal separator inequalities added: //g' tmp_log_lpr_m.txt
-    sed -i 's/\[LPR\] Indegree inequalities added: //g' tmp_log_lpr_i.txt
-    paste tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt | awk '{print $1 + $2 + $3}' >>tmp_log_lpr.txt
-    rm tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt
-
-    # get the number of cuts shown in the final statistics (cuts actually applied to improve the dual bound)
-    grep 'User: ' "$entry""_xp14.out" >>tmp_log_user.txt || echo "  User: 0" >>tmp_log_user.txt
-    grep 'Lazy ' "$entry""_xp14.out" >>tmp_log_lazy.txt || echo "  Lazy constraints: 0" >>tmp_log_lazy.txt
-    sed -i 's/  User: //g' tmp_log_user.txt
-    sed -i 's/  Lazy constraints: //g' tmp_log_lazy.txt
-
-    # if not running/adding cuts from strengthened LPR above, just count user cuts + lazy constraints
-    #paste tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % "$1 + $2}' >>xp14.dat
-    #rm tmp_log_user.txt tmp_log_lazy.txt
-
-    # otherwise, saving cut count during LPR and user+lazy
-    paste tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % " $1 " + " $2 + $3}' >>xp14.dat
-    rm tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt
 
     ((++idx))
 done
@@ -315,40 +250,16 @@ do
     timestamp=$(date)
     $(echo -e "[$timestamp]  done\n" >> "$entry""_xp14.out")
 
-    # adding number of cuts from the strengthened LP relaxation to those reported by gurobi
-    grep '\[LPR\] Blossom inequalities added: '            "$entry""_xp14.out"  >>tmp_log_lpr_b.txt 
-    grep '\[LPR\] Minimal separator inequalities added: '  "$entry""_xp14.out"  >>tmp_log_lpr_m.txt
-    grep '\[LPR\] Indegree inequalities added: '           "$entry""_xp14.out"  >>tmp_log_lpr_i.txt
-    sed -i 's/\[LPR\] Blossom inequalities added: //g' tmp_log_lpr_b.txt
-    sed -i 's/\[LPR\] Minimal separator inequalities added: //g' tmp_log_lpr_m.txt
-    sed -i 's/\[LPR\] Indegree inequalities added: //g' tmp_log_lpr_i.txt
-    paste tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt | awk '{print $1 + $2 + $3}' >>tmp_log_lpr.txt
-    rm tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt
-
-    # get the number of cuts shown in the final statistics (cuts actually applied to improve the dual bound)
-    grep 'User: ' "$entry""_xp14.out" >>tmp_log_user.txt || echo "  User: 0" >>tmp_log_user.txt
-    grep 'Lazy ' "$entry""_xp14.out" >>tmp_log_lazy.txt || echo "  Lazy constraints: 0" >>tmp_log_lazy.txt
-    sed -i 's/  User: //g' tmp_log_user.txt
-    sed -i 's/  Lazy constraints: //g' tmp_log_lazy.txt
-
-    # if not running/adding cuts from strengthened LPR above, just count user cuts + lazy constraints
-    #paste tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % "$1 + $2}' >>xp14.dat
-    #rm tmp_log_user.txt tmp_log_lazy.txt
-
-    # otherwise, saving cut count during LPR and user+lazy
-    paste tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % " $1 " + " $2 + $3}' >>xp14.dat
-    rm tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt
-
     ((++idx))
 done
 
 
 idx=1
-for entry in "${instances_dimacs_gmwcs_gam[@]}";
+for entry in "${instances_dimacs_mwcs_actmod[@]}";
 do
     timestamp=$(date)
     $(echo "[$timestamp]  $entry" >> "$entry""_xp14.out")
-    echo "[$timestamp] $idx/${#instances_dimacs_gmwcs_gam[@]}:  $entry"
+    echo "[$timestamp] $idx/${#instances_dimacs_mwcs_actmod[@]}:  $entry"
 
     output=$(./wcm  $entry  >> "$entry""_xp14.out" 2>&1)
     echo "$output"
@@ -356,30 +267,22 @@ do
     timestamp=$(date)
     $(echo -e "[$timestamp]  done\n" >> "$entry""_xp14.out")
 
-    # adding number of cuts from the strengthened LP relaxation to those reported by gurobi
-    grep '\[LPR\] Blossom inequalities added: '            "$entry""_xp14.out"  >>tmp_log_lpr_b.txt 
-    grep '\[LPR\] Minimal separator inequalities added: '  "$entry""_xp14.out"  >>tmp_log_lpr_m.txt
-    grep '\[LPR\] Indegree inequalities added: '           "$entry""_xp14.out"  >>tmp_log_lpr_i.txt
-    sed -i 's/\[LPR\] Blossom inequalities added: //g' tmp_log_lpr_b.txt
-    sed -i 's/\[LPR\] Minimal separator inequalities added: //g' tmp_log_lpr_m.txt
-    sed -i 's/\[LPR\] Indegree inequalities added: //g' tmp_log_lpr_i.txt
-    paste tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt | awk '{print $1 + $2 + $3}' >>tmp_log_lpr.txt
-    rm tmp_log_lpr_b.txt tmp_log_lpr_m.txt tmp_log_lpr_i.txt
-
-    # get the number of cuts shown in the final statistics (cuts actually applied to improve the dual bound)
-    grep 'User: ' "$entry""_xp14.out" >>tmp_log_user.txt || echo "  User: 0" >>tmp_log_user.txt
-    grep 'Lazy ' "$entry""_xp14.out" >>tmp_log_lazy.txt || echo "  Lazy constraints: 0" >>tmp_log_lazy.txt
-    sed -i 's/  User: //g' tmp_log_user.txt
-    sed -i 's/  Lazy constraints: //g' tmp_log_lazy.txt
-
-    # if not running/adding cuts from strengthened LPR above, just count user cuts + lazy constraints
-    #paste tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % "$1 + $2}' >>xp14.dat
-    #rm tmp_log_user.txt tmp_log_lazy.txt
-
-    # otherwise, saving cut count during LPR and user+lazy
-    paste tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt | awk '{print " % " $1 " + " $2 + $3}' >>xp14.dat
-    rm tmp_log_lpr.txt tmp_log_user.txt tmp_log_lazy.txt
-
     ((++idx))
 done
 
+
+idx=1
+for entry in "${instances_dimacs_mwcs_gam[@]}";
+do
+    timestamp=$(date)
+    $(echo "[$timestamp]  $entry" >> "$entry""_xp14.out")
+    echo "[$timestamp] $idx/${#instances_dimacs_mwcs_gam[@]}:  $entry"
+
+    output=$(./wcm  $entry  >> "$entry""_xp14.out" 2>&1)
+    echo "$output"
+
+    timestamp=$(date)
+    $(echo -e "[$timestamp]  done\n" >> "$entry""_xp14.out")
+
+    ((++idx))
+done

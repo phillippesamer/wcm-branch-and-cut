@@ -269,7 +269,7 @@ void IO::save_lpr_info(double lp_bound, double lp_time)
     summary_info << setw(8) << "  &&  ";
 }
 
-void IO::save_ip_info(double lb,
+void IO::save_bc_info(double lb,
                       double ub,
                       double gap,
                       double time,
@@ -278,7 +278,7 @@ void IO::save_ip_info(double lb,
                       long msi_count,
                       long indegree_count)
 {
-    /// save mip info: lb ub gap time #nodes #msi #indegree
+    /// save mip info: lb ub gap time #nodes #blossom #msi #indegree
 
     summary_info << setw(8) << fixed << setprecision(2) << lb;
     summary_info << setw(8) << "  &  ";
@@ -306,6 +306,34 @@ void IO::save_ip_info(double lb,
     summary_info << setw(8) << "  \\\\  ";
 }
 
+void IO::save_compact_info(double lb,
+                           double ub,
+                           double gap,
+                           double time,
+                           long node_count)
+{
+    /// save mip info: lb ub gap time #nodes
+
+    summary_info << setw(8) << fixed << setprecision(2) << lb;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << fixed << setprecision(2) << ub;
+
+    summary_info << setw(8) << "  &  ";
+    if (gap < 10) // < 1000%
+    {
+        double percentual_gap = 100 * gap;
+        summary_info << setw(8) << fixed << setprecision(2) << percentual_gap;
+    }
+    else
+        summary_info << setw(8) << " -- ";
+
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << fixed << setprecision(2) << time;
+    summary_info << setw(8) << "  &  ";
+    summary_info << setw(8) << node_count;
+    summary_info << setw(8) << "  \\\\  ";
+}
+
 void IO::write_summary_info(string output_file_path)
 {
     /// write all the saved info as a line in the given file
@@ -314,7 +342,7 @@ void IO::write_summary_info(string output_file_path)
     if (xpfile.is_open())
     {
         xpfile << summary_info.str();
-        //xpfile << endl;
+        xpfile << endl;
         xpfile.close();
     }
     else

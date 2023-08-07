@@ -6,7 +6,7 @@ bool GRB_CUTS = true;             // gurobi (automatic) cuts on/off
 bool GRB_HEURISTICS = true;       // gurobi (automatic) heuristics on/off
 bool GRB_PREPROCESSING = true;    // gurobi (automatic) preprocessing on/off
 
-bool GRB_HEURISTICS_FOCUS = true; // extra focus on gurobi heuristics
+const bool GRB_HEURISTICS_FOCUS = true; // extra focus on gurobi heuristics
 
 const double EPSILON_TOL = 1e-5;
 
@@ -600,7 +600,7 @@ bool WCMModel::solve_lp_relax(bool logging, double time_limit, bool grb_cuts_off
             {
                 double y_u = y[u].get(GRB_DoubleAttr_X);
                 if (y_u > EPSILON_TOL && y_u < 1-EPSILON_TOL)
-                    ++y_u;
+                    ++y_frac;
             }
 
             if (x_frac > 0 || y_frac > 0)

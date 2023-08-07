@@ -41,6 +41,7 @@ public:
 
 private:
     friend class IO;
+    friend class CompactWCMModel;
     friend class WCMModel;
     friend class WCMCutGenerator;
 
