@@ -24,7 +24,7 @@ bool SEPARATORS_BASED_FORMULATION = false;
 double RUN_WCM_WITH_TIME_LIMIT = 3600.0;
 
 bool WRITE_LATEX_TABLE_ROW = true;
-string LATEX_TABLE_FILE_PATH = string("xp14.dat");
+string LATEX_TABLE_FILE_PATH = string("xp15.dat");
 
 // switches concerning the exponential formulation only
 bool DEDICATED_LP_RELAXATION = true;
@@ -65,6 +65,17 @@ int main(int argc, char **argv)
                 return 0;
         }
     }
+
+    /*
+    if (instance->only_nonpositive_weights)
+    {
+        cout << endl << "*** All edges in instance " << instance->instance_id
+             << " have non-positive weight." << endl;
+        cout << endl << "*** Empty solution is optimal." << endl;
+
+        return 0;
+    }
+    */
 
     if (WRITE_LATEX_TABLE_ROW)
         instance->save_instance_info();
@@ -108,8 +119,12 @@ int main(int argc, char **argv)
         // 2.B INTEGER PROGRAM CORRESPONDING TO THE COMPACT, ARC-FLOW FORMULATION
 
         CompactWCMModel *model = new CompactWCMModel(instance);
+
+        model->solve_lp_relax(false, RUN_WCM_WITH_TIME_LIMIT);
+        if (WRITE_LATEX_TABLE_ROW)
+            instance->save_lpr_info(model->lp_bound, model->lp_runtime);
         
-        model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT);
+        model->set_time_limit(RUN_WCM_WITH_TIME_LIMIT - model->lp_runtime);
         model->solve(true);
 
         if (WRITE_LATEX_TABLE_ROW)

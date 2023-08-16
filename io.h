@@ -43,6 +43,7 @@ public:
     // instance data
     string instance_id;
     string instance_id_trimmed;
+    bool only_nonpositive_weights;
 
 private:
     friend class CompactWCMModel;

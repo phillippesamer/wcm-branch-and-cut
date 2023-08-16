@@ -50,6 +50,7 @@ bool IO::parse_gcc_file(string filename)
         this->graph->init_index_matrix();
 
         // m lines for edges
+        this->only_nonpositive_weights = true;
         for (long line_idx = 0; line_idx < num_edges; ++line_idx)
         {
             long i, j;
@@ -79,6 +80,10 @@ bool IO::parse_gcc_file(string filename)
             // store index of current edge
             graph->index_matrix[i][j] = line_idx;
             graph->index_matrix[j][i] = line_idx;
+
+            // keeping track if all edges have <= 0 weight
+            if (w > 0 && only_nonpositive_weights)
+                only_nonpositive_weights = false;
         }
 
         input_fh.close();
@@ -137,6 +142,7 @@ bool IO::parse_stp_file(string filename, bool edge_weights_given)
         this->graph->init_index_matrix();
 
         // 3. m LINES FOR EDGES
+        this->only_nonpositive_weights = true;
         for (long line_idx = 0; line_idx < num_edges; ++line_idx)
         {
             // must skip a word (the edge line marker "E"): e.g. "E 1 2" 
@@ -154,6 +160,10 @@ bool IO::parse_stp_file(string filename, bool edge_weights_given)
                 double weight;
                 input_fh >> weight;
                 graph->w.push_back(weight);
+
+                // keeping track if all edges have <= 0 weight
+                if (weight > 0 && only_nonpositive_weights)
+                    only_nonpositive_weights = false;
             }
 
             graph->s.push_back(i);
@@ -217,6 +227,10 @@ bool IO::parse_stp_file(string filename, bool edge_weights_given)
                 double w = tmp_vertex_weights.at(v1) + tmp_vertex_weights.at(v2);
                 
                 graph->w.push_back(w);
+
+                // keeping track if all edges have <= 0 weight
+                if (w > 0 && only_nonpositive_weights)
+                    only_nonpositive_weights = false;
             }
         }
 

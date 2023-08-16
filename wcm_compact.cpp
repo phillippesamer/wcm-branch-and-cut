@@ -139,7 +139,7 @@ void CompactWCMModel::create_constraints()
         model->addConstr(link_xy == 0, cname.str());
     }
 
-    // 3. EXACTLY ONE ARC LEAVING THE ARTIFICIAL SOURCE
+    // 3. EXACTLY ONE ARC LEAVING THE ARTIFICIAL SOURCE (IF ANY)
     GRBLinExpr one_arc_from_src_cnstr = 0;
     for (long u = 0; u < num_vertices; ++u)
     {
@@ -148,7 +148,7 @@ void CompactWCMModel::create_constraints()
     }
     cname.str("");
     cname << "C3_ONE_ARC_FROM_S";
-    model->addConstr(one_arc_from_src_cnstr == 1, cname.str());
+    model->addConstr(one_arc_from_src_cnstr <= 1, cname.str());
 
     // 4. MAY OPEN ARC LEAVING U ONLY IF THERE EXISTS AN ARC ENTERING U
     for (long u = 0; u < num_vertices; ++u)
@@ -704,7 +704,10 @@ bool CompactWCMModel::solve_lp_relax(bool logging, double time_limit)
                 cout << "[LPR] " << y_frac << " fractional y variables" << endl;
             }
             else
+            {
                 cout << "[LPR] integer feasible solution" << endl;
+                this->save_optimization_status();
+            }
 
             // restore IP model
             for (long e = 0; e < num_edges; ++e)
