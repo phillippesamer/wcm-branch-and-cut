@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 from separators import min_ab_separators
@@ -6,16 +6,52 @@ from separators import min_ab_separators
 import networkx as nx
 import subprocess
 
+def get_graph_Petersen() -> nx.Graph:
+    G = nx.Graph()
+    G.add_nodes_from(range(1,11))
+    G.add_edges_from([(1,3), (1,4), (1,6), (2,4), (2,5), (2,7), (3,5), (3,8), (4,9), (5,10), (6,7), (6,10), (7,8), (8,9), (9,10)])
+    return G
+
+def get_graph_Johnson_26() -> nx.Graph:
+    G = nx.Graph()
+    G.add_nodes_from(range(1,9))
+    G.add_edges_from([(1,2), (1,3), (2,4), (3,4), (5,1), (5,2), (5,6), (6,7), (6,8), (7,8), (7,2), (7,4), (8,1), (8,3)])
+    return G
+
+def get_graph_W6() -> nx.Graph:
+    G = nx.Graph()
+    G.add_nodes_from(range(1,7))
+    G.add_edges_from([(1,2), (1,3), (1,4), (1,5), (1,6), (2,3), (3,4), (4,5), (5,6), (6,2)])
+    return G
+
+def get_graph_house() -> nx.Graph:
+    G = nx.Graph()
+    G.add_nodes_from(range(1,6))
+    G.add_edges_from([(1,2), (1,3), (2,3), (2,4), (3,5), (4,5)])
+    return G
+
 def get_graph_P5() -> nx.Graph:
     G = nx.Graph()
     G.add_nodes_from(range(1,6))
     G.add_edges_from([(1,2), (2,3), (3,4), (4,5)])
     return G
 
+def get_graph_P6() -> nx.Graph:
+    G = nx.Graph()
+    G.add_nodes_from(range(1,7))
+    G.add_edges_from([(1,2), (2,3), (3,4), (4,5), (5,6)])
+    return G
+
 def get_graph_C4() -> nx.Graph:
     G = nx.Graph()
     G.add_nodes_from(range(1,5))
     G.add_edges_from([(1,2), (2,3), (3,4), (4,1)])
+    return G
+
+def get_graph_C5() -> nx.Graph:
+    G = nx.Graph()
+    G.add_nodes_from(range(1,6))
+    G.add_edges_from([(1,2), (2,3), (3,4), (4,5), (5,1)])
     return G
 
 def get_graph_claw() -> nx.Graph:
@@ -46,6 +82,12 @@ def get_graph_k_1_5() -> nx.Graph:
     G = nx.Graph()
     G.add_nodes_from(range(1,7))
     G.add_edges_from([(1,2), (1,3), (1,4), (1,5), (1,6)])
+    return G
+
+def get_graph_k_2_4() -> nx.Graph:
+    G = nx.Graph()
+    G.add_nodes_from(range(1,7))
+    G.add_edges_from([(1,3), (1,4), (1,5), (1,6), (2,3), (2,4), (2,5), (2,6)])
     return G
 
 def get_ilp_formulation(G: nx.Graph) -> str:
@@ -131,9 +173,9 @@ def get_ilp_formulation(G: nx.Graph) -> str:
 
 def main():
     # specify the input graph following the example functions above
-    graph = get_graph_claw()
-    output_lp_file     = "examples/claw_original.lp"
-    output_facets_file = "examples/claw_facets.lp"
+    graph = get_graph_Petersen()
+    output_lp_file     = "examples/Petersen_original.lp"
+    output_facets_file = "examples/Petersen_facets.lp"
 
     # generate "separators-based formulation" ILP corresponding to this input
     print("writing ilp on file " + output_lp_file)
